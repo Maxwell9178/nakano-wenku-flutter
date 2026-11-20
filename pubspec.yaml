@@ -1,0 +1,62 @@
+name: nakanowenku
+description: "NakanoWenku — 本地优先、开源免费的中文轻小说阅读器（Flutter / Dart）。"
+publish_to: "none"
+
+# 版本号规则：versionName+versionCode。
+# 后续版本更新模块中的 version.json 需要与这里保持一致。
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.16.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # 图标（Material 内置图标为主，这里仅保留 Flutter 默认依赖）。
+  cupertino_icons: ">=1.0.6 <2.0.0"
+
+  # 状态共享：主题、毛玻璃参数、账号资料等全局状态。
+  provider: ">=6.1.0 <7.0.0"
+
+  # 本地持久化：全部业务数据只保存在本机，不做任何云端依赖。
+  shared_preferences: ">=2.2.0 <3.0.0"
+
+  # 应用私有目录（头像、导入的书籍、备份临时文件等）。
+  path_provider: ">=2.1.0 <3.0.0"
+
+  # 纯 Dart 工具库：拼接文件路径。
+  path: ">=1.8.0 <2.0.0"
+
+  # 系统文件选择器：选择头像、导入书籍、手动挑选备份包。
+  file_picker: ">=6.1.0 <11.0.0"
+
+  # zip 解析：.wkarchive 备份包本质是 zip，仅修改了后缀。
+  archive: ">=3.4.0 <4.0.0"
+
+  # 唤起系统浏览器：导入页的网站快捷小球。
+  url_launcher: ">=6.1.0 <7.0.0"
+
+  # 读取本机全部文件需要「所有文件访问」权限，导入页扫描前会申请。
+  permission_handler: ">=11.0.0 <13.0.0"
+
+  # 把「读完卡片」保存到系统相册（读取相册权限不涉及，只写入）。
+  gal: ">=2.3.0 <3.0.0"
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ">=3.0.0 <6.0.0"
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/data/
+
+  # 说明：
+  # 1. 中文标题、英文署名优先使用系统衬线字体族 + 常见中文宋体回退，
+  #    不强制内置字体文件，用户可在后续「设置」中自行导入第三方字体。
+  # 2. 正文跟随系统字体，保证第三方字体兼容性。

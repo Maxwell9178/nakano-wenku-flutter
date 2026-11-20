@@ -1,0 +1,20 @@
+# NakanoWenku 静态检查配置。
+#
+# 只继承 Flutter 官方推荐规则（flutter_lints），不额外开启更严格的规则，
+# 避免不同 Flutter 版本之间出现「本机通过、别人报错」的差异。
+
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - build/**
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - android/**
+
+linter:
+  rules:
+    # 团队约定：公开 API 尽可能写文档注释，但不对私有成员强制要求。
+    public_member_api_docs: false
+    # 中文注释较多，单行长度不做硬性限制。
+    lines_longer_than_80_chars: false
