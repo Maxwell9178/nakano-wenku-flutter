@@ -88,8 +88,9 @@ class _BookmarkListPageState extends State<BookmarkListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final Color textColor = AppColors.textPrimary(Theme.of(context).brightness);
+    final ThemeData theme = Theme.of(context);
+    final Brightness brightness = theme.brightness;
+    final Color textColor = AppColors.textPrimary(brightness);
 
     return Scaffold(
       body: GridBackground(

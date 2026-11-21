@@ -20,7 +20,7 @@ import '../../core/widgets/page_top_bar.dart';
 import '../../core/widgets/pressable_scale.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/text_input_dialog.dart';
-import '../../core/widgets/thin_divider.dart';
+// (thin_divider import removed: page draws its own hairlines)
 import 'import_controller.dart';
 import 'widgets/import_progress_card.dart';
 import 'widgets/site_ball.dart';

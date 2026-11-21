@@ -30,17 +30,17 @@ class AppConstants {
 
   // ---------------- 版本更新 ----------------
 
-  /// 主源：Gitee Pages 上托管的静态 version.json。
+  /// 主源：Gitee 仓库 raw 的 version.json（国内直连、无需 Pages）。
   ///
-  /// 部署方式见工程根目录「打包与发布说明.md」：
-  /// 仓库开启 Pages 后，把 version.json 与 app-release.apk 放在部署目录根下，
-  /// 这里的地址就是 Pages 给出的公开链接。
+  /// 只要把 version.json 推到 master 分支根目录，这个地址立刻可读；
+  /// 实测返回 200，是当前最稳的一路清单源。
   static const String updateManifestUrl =
-      'https://maxwell9178.gitee.io/nakano-wenku-flutter/version.json';
+      'https://gitee.com/maxwell9178/nakano-wenku-flutter/raw/master/version.json';
 
-  /// 主源兜底：仓库 raw 文件（Pages 未部署或尚未刷新时仍能读到）。
+  /// 主源备用：Gitee Pages 地址（账号未实名时 Pages 不可用，留着做兜底，
+  /// 一旦以后开通并部署到 master，这里会自动开始生效）。
   static const String updateRawManifestUrl =
-      'https://gitee.com/Maxwell9178/nakano-wenku-flutter/raw/master/version.json';
+      'https://maxwell9178.gitee.io/nakano-wenku-flutter/version.json';
 
   /// 备用源：GitHub Releases 最新发布接口。
   static const String updateApiUrl =
@@ -65,9 +65,9 @@ class AppConstants {
   static const String updateReleasesPage =
       'https://github.com/Maxwell9178/nakano-wenku-flutter/releases';
 
-  /// Gitee Pages 上的 APK 直链，与 version.json 里的 downloadUrl 保持一致。
+  /// APK 直链：Gitee 对匿名 raw 的大文件返回 403，所以安装包走 GitHub Releases。
   static const String updateApkUrl =
-      'https://maxwell9178.gitee.io/nakano-wenku-flutter/app-release.apk';
+      'https://github.com/Maxwell9178/nakano-wenku-flutter/releases/download/1.0.0/app-release.apk';
 
   /// 兜底 APK 直链：清单里没给 downloadUrl 时，按顺序换这些地址试。
   static const List<String> updateApkFallbackUrls = <String>[

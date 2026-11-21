@@ -124,13 +124,13 @@ class UpdateService {
   Future<UpdateCheckResult> check() async {
     final List<_UpdateSource> sources = <_UpdateSource>[
       _UpdateSource(
-        label: 'Gitee Pages',
+        label: 'Gitee raw',
         uri: _manifestUri,
         parser: AppVersionInfo.fromManifest,
       ),
-      // Pages 还没部署或缓存未刷新时，回落到仓库 raw 文件。
+      // Pages 未开通时这里会快速 404，随后自动落到下一路源。
       _UpdateSource(
-        label: 'Gitee',
+        label: 'Gitee Pages',
         uri: Uri.parse(AppConstants.updateRawManifestUrl),
         parser: AppVersionInfo.fromManifest,
       ),
