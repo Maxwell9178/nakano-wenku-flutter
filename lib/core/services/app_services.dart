@@ -5,6 +5,7 @@ import 'account_data_service.dart';
 import 'backup_import_service.dart';
 import 'book_import_service.dart';
 import 'book_repository.dart';
+import 'bookmark_repository.dart';
 import 'chapter_repository.dart';
 import 'custom_font_service.dart';
 import 'excerpt_repository.dart';
@@ -14,6 +15,8 @@ import 'local_storage_service.dart';
 import 'quote_repository.dart';
 import 'reading_preferences_repository.dart';
 import 'reading_stats_repository.dart';
+import 'reading_time_service.dart';
+import 'tag_weight_repository.dart';
 import 'update_service.dart';
 import 'user_profile_controller.dart';
 import 'wkarchive_service.dart';
@@ -76,6 +79,17 @@ class AppServices {
   /// 版本更新检测（唯一允许发起网络请求的服务）。
   late final UpdateService update;
 
+  /// 书签库。
+  late final BookmarkRepository bookmarks;
+
+  /// 批注库。
+
+  /// 阅读标签权重（雷达图数据源）。
+  late final TagWeightRepository tagWeights;
+
+  /// 单本书阅读时长累计与落盘。
+  late final ReadingTimeService readingTime;
+
   bool get isReady => _ready;
 
   /// 应用启动时调用一次，完成本地存储与全局状态的初始化。
@@ -97,6 +111,14 @@ class AppServices {
     excerpts = ExcerptRepository(storage);
     quotes = QuoteRepository();
     readingStats = ReadingStatsRepository(storage)..load();
+    bookmarks = BookmarkRepository(storage);
+    tagWeights = TagWeightRepository(storage);
+    readingTime = ReadingTimeService(
+      books: books,
+      tagWeights: tagWeights,
+    );
+    // 启动时按现有书籍重算一次权重，保证雷达图与阅读数据一致。
+    await tagWeights.recompute(books.loadAll());
     accountData = AccountDataService(
       storage: storage,
       books: books,
@@ -106,6 +128,8 @@ class AppServices {
       stats: readingStats,
       excerpts: excerpts,
       readingPreferences: readingPreferences,
+      bookmarks: bookmarks,
+      tagWeights: tagWeights,
     );
     wkArchive = WkArchiveService(
       books: books,
@@ -117,6 +141,8 @@ class AppServices {
       profile: profile,
       settings: settings,
       storage: storage,
+      bookmarks: bookmarks,
+      tagWeights: tagWeights,
     );
     customFonts = CustomFontService(storage);
     // 上次导入的第三方字体需要在启动阶段重新注册（注册不跨进程保留）。

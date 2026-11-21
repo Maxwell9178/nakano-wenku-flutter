@@ -78,7 +78,8 @@ class _SearchPageState extends State<SearchPage> {
 
   Future<void> _openBook(Book book) async {
     _focus.unfocus();
-    await Navigator.of(context).pushNamed(AppRoutes.bookDetail, arguments: book);
+    await Navigator.of(context)
+        .pushNamed(AppRoutes.bookDetail, arguments: book);
     if (mounted) {
       _controller?.loadBooks();
     }
@@ -110,8 +111,9 @@ class _SearchPageState extends State<SearchPage> {
             return LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) {
                 // 搜索框落在页面上方约四分之一处：比正中更轻，也比贴顶自然。
-                final double topSpace =
-                    (constraints.maxHeight * 0.20).clamp(48.0, 180.0).toDouble();
+                final double topSpace = (constraints.maxHeight * 0.20)
+                    .clamp(48.0, 180.0)
+                    .toDouble();
 
                 return Column(
                   children: <Widget>[
@@ -195,73 +197,75 @@ class _SearchPageState extends State<SearchPage> {
       padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
       onTap: _focus.requestFocus,
       child: Row(
-          children: <Widget>[
-            Icon(
-              Icons.search_rounded,
-              size: 19,
-              color: focused ? accent : AppColors.textTertiary(brightness),
+        children: <Widget>[
+          Icon(
+            Icons.search_rounded,
+            size: 19,
+            color: focused ? accent : AppColors.textTertiary(brightness),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _text,
+              focusNode: _focus,
+              // 进入页面不自动聚焦：只有用户点搜索框才唤起键盘。
+              autofocus: false,
+              textInputAction: TextInputAction.search,
+              style: TextStyle(
+                fontSize: 13.5,
+                letterSpacing: 0.4,
+                color: AppColors.textPrimary(brightness),
+              ),
+              cursorColor: accent,
+              cursorWidth: 1.4,
+              decoration: InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                hintText: '支持联想搜索哦！',
+                hintStyle: TextStyle(
+                  fontSize: 12.5,
+                  letterSpacing: 0.6,
+                  color: AppColors.textTertiary(brightness),
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              onChanged: controller.updateQuery,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: TextField(
-                controller: _text,
-                focusNode: _focus,
-                // 进入页面不自动聚焦：只有用户点搜索框才唤起键盘。
-                autofocus: false,
-                textInputAction: TextInputAction.search,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  letterSpacing: 0.4,
-                  color: AppColors.textPrimary(brightness),
+          ),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: controller.hasQuery ? 1 : 0,
+            child: PressableScale(
+              pressedScale: 0.9,
+              onTap: controller.hasQuery
+                  ? () {
+                      _text.clear();
+                      controller.clear();
+                    }
+                  : null,
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 16,
+                  color: AppColors.textTertiary(brightness),
                 ),
-                cursorColor: accent,
-                cursorWidth: 1.4,
-                decoration: InputDecoration(
-                  isDense: true,
-                  border: InputBorder.none,
-                  hintText: '支持联想搜索哦！',
-                  hintStyle: TextStyle(
-                    fontSize: 12.5,
-                    letterSpacing: 0.6,
-                    color: AppColors.textTertiary(brightness),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                onChanged: controller.updateQuery,
               ),
             ),
-            AnimatedOpacity(
-              duration: const Duration(milliseconds: 200),
-              opacity: controller.hasQuery ? 1 : 0,
-              child: PressableScale(
-                pressedScale: 0.9,
-                onTap: controller.hasQuery
-                    ? () {
-                        _text.clear();
-                        controller.clear();
-                      }
-                    : null,
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Icon(
-                    Icons.close_rounded,
-                    size: 16,
-                    color: AppColors.textTertiary(brightness),
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
+        ],
       ),
     );
   }
 
-  // ---------------- 未输入时的提示 ----------------
+  // ---------------- 未输入时的提示 + 阅读榜单外壳 ----------------
 
   Widget _buildIdle(
     Brightness brightness,
     LibrarySearchController controller,
   ) {
+    final List<Book> books = controller.allBooks;
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 130),
       children: <Widget>[
@@ -312,17 +316,176 @@ class _SearchPageState extends State<SearchPage> {
             );
           }).toList(),
         ),
-        const SizedBox(height: 30),
-        PlaceholderPanel(
-          title: '联想搜索',
-          english: 'SUGGESTED SEARCH',
-          description: controller.totalBooks == 0
-              ? '书架还是空的，导入书籍之后就能在这里搜索了。'
-              : '输入任意关键字，会实时联想书名、作者与标签。',
-          icon: Icons.manage_search_rounded,
-          footer: '全书共 ${controller.totalBooks} 本藏书',
+        const SizedBox(height: 26),
+        _buildRankPanel(brightness, books),
+      ],
+    );
+  }
+
+  /// 阅读榜单：按书籍累计阅读时长降序，无记录时给空状态。
+  Widget _buildRankPanel(Brightness brightness, List<Book> books) {
+    final Color accent = AppColors.accent(brightness);
+    final List<Book> ranked = books
+        .where((Book book) => book.totalReadMs > 0)
+        .toList()
+      ..sort((Book a, Book b) => b.totalReadMs.compareTo(a.totalReadMs));
+    final List<Book> preview = ranked.take(3).toList(growable: false);
+    final int slots = preview.isEmpty ? 1 : 3;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: <Widget>[
+            Text(
+              '阅读榜单',
+              style: AppTypography.chineseTitle(
+                brightness,
+                fontSize: 17,
+              ).copyWith(fontWeight: FontWeight.w600, letterSpacing: 1.0),
+            ),
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Text(
+                'READING RANK',
+                style: AppTypography.englishLabel(
+                  brightness,
+                  fontSize: 8.2,
+                  letterSpacing: 2.0,
+                ).copyWith(color: AppColors.textTertiary(brightness)),
+              ),
+            ),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Text(
+                preview.isEmpty ? '暂无记录' : '按累计时长排序',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  letterSpacing: 0.6,
+                  color: AppColors.textTertiary(brightness),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        LiquidGlass(
+          borderRadius: 24,
+          padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
+          child: Column(
+            children: <Widget>[
+              for (int i = 0; i < slots; i++)
+                _buildRankRow(
+                  brightness: brightness,
+                  accent: accent,
+                  rank: i + 1,
+                  book: i < preview.length ? preview[i] : null,
+                ),
+            ],
+          ),
         ),
       ],
+    );
+  }
+
+  String _readTimeLabel(Book book) {
+    final int minutes = (book.totalReadMs / 60000).ceil();
+    if (minutes < 60) {
+      return '$minutes 分钟';
+    }
+    final int hours = minutes ~/ 60;
+    final int rest = minutes % 60;
+    return rest == 0 ? '$hours 小时' : '$hours 小时 $rest 分';
+  }
+
+  Widget _buildRankRow({
+    required Brightness brightness,
+    required Color accent,
+    required int rank,
+    required Book? book,
+  }) {
+    final String number = rank.toString().padLeft(2, '0');
+    final bool hasBook = book != null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      child: Row(
+        children: <Widget>[
+          SizedBox(
+            width: 24,
+            child: Text(
+              number,
+              style: TextStyle(
+                fontFamily: AppFonts.serif,
+                fontFamilyFallback: AppFonts.serifFallback,
+                fontSize: 15,
+                fontWeight: rank == 1 ? FontWeight.w600 : FontWeight.w400,
+                letterSpacing: 1.0,
+                color: hasBook
+                    ? (rank == 1 ? accent : AppColors.textTertiary(brightness))
+                    : AppColors.alpha(AppColors.textTertiary(brightness), 0.4),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  hasBook ? book.title : '还没有阅读记录',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.3,
+                    letterSpacing: 0.3,
+                    color: hasBook
+                        ? AppColors.textPrimary(brightness)
+                        : AppColors.alpha(
+                            AppColors.textTertiary(brightness),
+                            0.7,
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        hasBook ? book.author : '开始阅读后这里会出现排行',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          letterSpacing: 0.3,
+                          color: AppColors.textTertiary(brightness),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      hasBook ? _readTimeLabel(book) : '—',
+                      style: TextStyle(
+                        fontFamily: AppFonts.serif,
+                        fontFamilyFallback: AppFonts.serifFallback,
+                        fontSize: 9.5,
+                        letterSpacing: 0.8,
+                        color: AppColors.alpha(
+                          AppColors.textTertiary(brightness),
+                          0.85,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

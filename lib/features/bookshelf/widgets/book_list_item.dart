@@ -54,10 +54,9 @@ class BookListItem extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 book.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontSize: 15.5,
+                                  height: 1.35,
                                   letterSpacing: 0.4,
                                 ),
                               ),

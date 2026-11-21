@@ -51,14 +51,15 @@ class BookInfoPanel extends StatelessWidget {
                 children: <Widget>[
                   Text(
                     book.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    // 长书名自动换行，不用省略号截断，卷号信息必须完整可见。
+                    softWrap: true,
                     style: AppTypography.chineseTitle(
                       brightness,
                       fontSize: 23,
                     ).copyWith(
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.6,
+                      height: 1.28,
                     ),
                   ),
                   const SizedBox(height: 7),

@@ -196,8 +196,7 @@ class WkArchiveFlow {
                                     style: TextStyle(
                                       fontSize: 9.5,
                                       letterSpacing: 0.4,
-                                      color:
-                                          AppColors.textTertiary(brightness),
+                                      color: AppColors.textTertiary(brightness),
                                     ),
                                   ),
                                 ],
@@ -297,9 +296,8 @@ class WkArchiveFlow {
     BuildContext context,
     WkArchivePayload payload,
   ) {
-    final String bookLabel = payload.includeBooks
-        ? '含 ${payload.bookCount} 本书的正文'
-        : '仅基础数据';
+    final String bookLabel =
+        payload.includeBooks ? '含 ${payload.bookCount} 本书的正文' : '仅基础数据';
     return showGlassDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) {

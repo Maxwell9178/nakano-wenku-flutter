@@ -89,16 +89,17 @@ class _ImportPageState extends State<ImportPage> {
                           padding: const EdgeInsets.fromLTRB(0, 18, 0, 150),
                           children: <Widget>[
                             _buildSites(context),
-                            const SizedBox(height: 22),
+                            const SizedBox(height: 26),
                             _buildFormats(context),
-                            const SizedBox(height: 22),
+                            const SizedBox(height: 26),
                             _buildScanRow(context),
-                            const SizedBox(height: 18),
+                            const SizedBox(height: 22),
                             if (_c.failures.isNotEmpty) _buildFailures(context),
                             _buildEntryList(context),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 24),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 24),
                               child: ImportHintLine(
                                 english: 'Offline import',
                                 text: '支持 EPUB / TXT / Markdown / DOCX / ZIP，'
@@ -122,7 +123,8 @@ class _ImportPageState extends State<ImportPage> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
-                          if (_c.importing && _c.progresses.isNotEmpty) ...<Widget>[
+                          if (_c.importing &&
+                              _c.progresses.isNotEmpty) ...<Widget>[
                             ImportProgressCard(progresses: _c.progresses),
                             const SizedBox(height: 10),
                           ],
@@ -154,7 +156,7 @@ class _ImportPageState extends State<ImportPage> {
             title: '快捷访问',
             english: 'Quick sites',
             trailing: Text(
-              '长按可移除',
+              '长按可编辑或移除',
               style: TextStyle(
                 fontSize: 9.5,
                 color: AppColors.textTertiary(brightness),
@@ -176,7 +178,7 @@ class _ImportPageState extends State<ImportPage> {
                   site: _c.sites[i],
                   index: i,
                   onTap: () => _openSite(_c.sites[i]),
-                  onLongPress: () => _removeSite(_c.sites[i]),
+                  onLongPress: () => _siteActions(_c.sites[i]),
                 ),
               ],
             ],
@@ -224,13 +226,97 @@ class _ImportPageState extends State<ImportPage> {
     await _c.addSite(name: name, url: url);
   }
 
+  /// 长按站点小球：编辑或移除（不直接删除，避免误触）。
+  Future<void> _siteActions(ImportSite site) async {
+    String action = '';
+    await showGlassDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return GlassDialogCard(
+          title: site.name,
+          english: 'QUICK SITE',
+          message: site.url,
+          actions: <Widget>[
+            GlassDialogButton(
+              label: '编辑',
+              onTap: () {
+                action = 'edit';
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+            GlassDialogButton(
+              label: '删除',
+              danger: true,
+              onTap: () {
+                action = 'delete';
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted) {
+      return;
+    }
+    if (action == 'edit') {
+      await _editSite(site);
+    } else if (action == 'delete') {
+      await _removeSite(site);
+    }
+  }
+
+  Future<void> _editSite(ImportSite site) async {
+    final String? name = await showTextInputDialog(
+      context: context,
+      title: '站点名称',
+      english: 'Site name',
+      message: '名称只保存在本机，可随时修改。',
+      hintText: '例如：轻小说文库',
+      initialValue: site.name,
+      maxLength: 12,
+    );
+    if (name == null || name.isEmpty || !mounted) {
+      return;
+    }
+
+    final String? url = await showTextInputDialog(
+      context: context,
+      title: '站点网址',
+      english: 'Site url',
+      message: '网址会隐藏保存，界面只显示名称。',
+      hintText: 'https://example.com',
+      initialValue: site.url,
+      maxLength: 200,
+      keyboardType: TextInputType.url,
+      validator: (String value) {
+        final Uri? uri = Uri.tryParse(value);
+        if (uri == null ||
+            !uri.hasScheme ||
+            (uri.scheme != 'http' && uri.scheme != 'https')) {
+          return '请输入 http / https 开头的完整网址';
+        }
+        return null;
+      },
+    );
+    if (url == null || !mounted) {
+      return;
+    }
+
+    await _c.updateSite(id: site.id, name: name, url: url);
+    if (mounted) {
+      showSoftMessage(context, '快捷入口已更新');
+    }
+  }
+
   Future<void> _openSite(ImportSite site) async {
     final Uri? uri = Uri.tryParse(site.url);
     if (uri == null) {
       return;
     }
     try {
-      final bool opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final bool opened =
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!opened && mounted) {
         showSoftMessage(context, '没有找到可用的浏览器');
       }
@@ -455,7 +541,7 @@ class _ImportPageState extends State<ImportPage> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 26),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: AppColors.alpha(AppColors.divider(brightness), 0.85),
               width: 0.8,
@@ -494,6 +580,20 @@ class _ImportPageState extends State<ImportPage> {
       return const SizedBox.shrink();
     }
 
+    // 按原始文件夹分区块：只显示文件夹名，不显示完整路径。
+    final Map<String, List<LocalFileEntry>> groups =
+        <String, List<LocalFileEntry>>{};
+    for (final LocalFileEntry entry in _c.entries) {
+      final int slash = entry.path.lastIndexOf('/');
+      final String raw = slash <= 0 ? '' : entry.path.substring(0, slash);
+      final int sep = raw.lastIndexOf('/');
+      final String name =
+          raw.isEmpty ? '内部存储' : (sep < 0 ? raw : raw.substring(sep + 1));
+      groups
+          .putIfAbsent(name.isEmpty ? '内部存储' : name, () => <LocalFileEntry>[])
+          .add(entry);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -524,76 +624,147 @@ class _ImportPageState extends State<ImportPage> {
             ),
           ),
         SizedBox(
-          height: 420,
-          child: ListView.separated(
+          height: 430,
+          child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
-            itemCount: _c.entries.length,
-            separatorBuilder: (BuildContext context, int index) => ThinDivider(
-              thickness: 0.7,
-              color: AppColors.alpha(AppColors.divider(brightness), 0.7),
-            ),
-            itemBuilder: (BuildContext context, int index) {
-              final LocalFileEntry entry = _c.entries[index];
-              final bool selected = _c.selectedPaths.contains(entry.path);
-              return PressableScale(
-                pressedScale: 0.99,
-                onTap: () => _c.toggleEntry(entry.path),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 9),
-                  child: Row(
-                    children: <Widget>[
-                      Icon(
-                        selected
-                            ? Icons.check_box_rounded
-                            : Icons.check_box_outline_blank_rounded,
-                        size: 19,
-                        color: selected
-                            ? AppColors.accent(brightness)
-                            : AppColors.textTertiary(brightness),
-                      ),
-                      const SizedBox(width: 11),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              entry.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: AppColors.textPrimary(brightness),
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              '${entry.extension.toUpperCase()} · ${entry.sizeLabel}',
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                letterSpacing: 0.3,
-                                color: AppColors.textTertiary(brightness),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      if (!_c.supportedForParsing(entry.extension))
-                        Text(
-                          '暂不支持解析',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: AppColors.textTertiary(brightness),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            },
+            children: <Widget>[
+              for (final MapEntry<String, List<LocalFileEntry>> group
+                  in groups.entries) ...<Widget>[
+                _buildFolderHeader(brightness, group.key, group.value),
+                for (final LocalFileEntry entry in group.value)
+                  _buildEntryRow(brightness, entry),
+              ],
+            ],
           ),
         ),
       ],
+    );
+  }
+
+  /// 文件夹区块标题 + 本区块独立全选。
+  Widget _buildFolderHeader(
+    Brightness brightness,
+    String folder,
+    List<LocalFileEntry> entries,
+  ) {
+    final int selected = entries
+        .where((LocalFileEntry e) => _c.selectedPaths.contains(e.path))
+        .length;
+    final bool all = selected == entries.length;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 4),
+      child: Row(
+        children: <Widget>[
+          Icon(
+            Icons.folder_rounded,
+            size: 15,
+            color: AppColors.textTertiary(brightness),
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              folder,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary(brightness),
+              ),
+            ),
+          ),
+          Text(
+            '$selected/${entries.length}',
+            style: TextStyle(
+              fontSize: 9,
+              color: AppColors.textTertiary(brightness),
+            ),
+          ),
+          const SizedBox(width: 8),
+          PressableScale(
+            pressedScale: 0.94,
+            onTap: () {
+              for (final LocalFileEntry entry in entries) {
+                final bool on = _c.selectedPaths.contains(entry.path);
+                if (on != all) {
+                  _c.toggleEntry(entry.path);
+                }
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: Text(
+                all ? '取消全选' : '全选',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: all
+                      ? AppColors.textTertiary(brightness)
+                      : AppColors.accent(brightness),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEntryRow(Brightness brightness, LocalFileEntry entry) {
+    final bool selected = _c.selectedPaths.contains(entry.path);
+    return PressableScale(
+      pressedScale: 0.99,
+      onTap: () => _c.toggleEntry(entry.path),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              selected
+                  ? Icons.check_box_rounded
+                  : Icons.check_box_outline_blank_rounded,
+              size: 19,
+              color: selected
+                  ? AppColors.accent(brightness)
+                  : AppColors.textTertiary(brightness),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    entry.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: AppColors.textPrimary(brightness),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${entry.extension.toUpperCase()} · ${entry.sizeLabel}',
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      letterSpacing: 0.3,
+                      color: AppColors.textTertiary(brightness),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (!_c.supportedForParsing(entry.extension))
+              Text(
+                '暂不支持解析',
+                style: TextStyle(
+                  fontSize: 9,
+                  color: AppColors.textTertiary(brightness),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -685,10 +856,28 @@ class _ImportPageState extends State<ImportPage> {
       mergeSelection = choice.selection;
     }
 
+    final String? group = await showTextInputDialog(
+      context: context,
+      title: '分组标签',
+      english: 'Group',
+      message: '给这次导入的书打一个分组，之后可在书架与搜索里筛选；留空表示不分组。',
+      hintText: '例如：轻小说 / 2024 冬季',
+      initialValue: _c.lastGroup ?? '',
+      maxLength: 16,
+      confirmLabel: '继续',
+      allowEmpty: true,
+    );
+    if (!mounted) {
+      return;
+    }
+    _c.lastGroup =
+        (group == null || group.trim().isEmpty) ? null : group.trim();
+
     final ImportOutcome? outcome = await _c.commitPlan(
       plan,
       mode: mode,
       mergeSelection: mergeSelection,
+      group: _c.lastGroup,
     );
     if (!mounted || outcome == null) {
       return;
@@ -900,7 +1089,7 @@ class _ModeTile extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: AppColors.alpha(AppColors.divider(brightness), 0.9),
             width: 0.8,

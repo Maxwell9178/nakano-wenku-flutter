@@ -35,9 +35,9 @@ class AppTheme {
 
     final ColorScheme scheme = base.copyWith(
       primary: accent,
-      onPrimary: isDark ? const Color(0xFF1A1206) : const Color(0xFFFFFBF3),
+      onPrimary: isDark ? const Color(0xFF101010) : const Color(0xFFFFFFFF),
       secondary: secondary,
-      onSecondary: isDark ? const Color(0xFF07120F) : const Color(0xFFF6FFFC),
+      onSecondary: isDark ? const Color(0xFF101010) : const Color(0xFFFFFFFF),
       surface: surface,
       onSurface: textPrimary,
       surfaceTint: Colors.transparent,

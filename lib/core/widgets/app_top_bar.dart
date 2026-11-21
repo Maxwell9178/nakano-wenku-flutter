@@ -7,12 +7,13 @@ import 'thin_divider.dart';
 
 /// 顶部固定栏（书架主页使用，后续页面可复用）。
 ///
-/// 需求：软件名 + 英文署名 + 细分割线，并且固定不随内容滑动消失。
-/// 因此这里只负责「长什么样」，由页面把它放在不受滚动影响的位置。
+/// 需求范式：软件名在上，英文署名紧贴其下方，二者之下是一根可见细分割线。
+/// 第一轮修正：署名不再与标题挤在同一行（避免被右侧截断），
+/// 分割线改用可见的浅灰色。
 class AppTopBar extends StatelessWidget {
   const AppTopBar({super.key, this.trailing, this.padding});
 
-  /// 右侧可选操作（例如后续轮次的导入按钮）。
+  /// 右侧可选操作（例如导入入口）。
   final Widget? trailing;
 
   final EdgeInsetsGeometry? padding;
@@ -20,7 +21,10 @@ class AppTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Brightness brightness = Theme.of(context).brightness;
-    final Color line = AppColors.divider(brightness);
+    final Color line = AppColors.alpha(
+      brightness == Brightness.dark ? Colors.white : Colors.black,
+      brightness == Brightness.dark ? 0.30 : 0.22,
+    );
 
     return Padding(
       padding: padding ?? const EdgeInsets.fromLTRB(24, 10, 24, 0),
@@ -30,39 +34,42 @@ class AppTopBar extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
-              Text(
-                AppConstants.appName,
-                style: TextStyle(
-                  fontFamily: AppFonts.serif,
-                  fontFamilyFallback: AppFonts.serifFallback,
-                  fontSize: 21,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 2.6,
-                  color: AppColors.textPrimary(brightness),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // 中间的分割线（竖直细线）。
-              Container(width: 0.8, height: 15, color: line),
-              const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  AppConstants.signature.toUpperCase(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.englishLabel(
-                    brightness,
-                    fontSize: 8.6,
-                    letterSpacing: 2.2,
-                    color: AppColors.textTertiary(brightness),
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      AppConstants.appName,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontFamily: AppFonts.serif,
+                        fontFamilyFallback: AppFonts.serifFallback,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 2.6,
+                        color: AppColors.textPrimary(brightness),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      AppConstants.signature.toUpperCase(),
+                      maxLines: 1,
+                      style: AppTypography.englishLabel(
+                        brightness,
+                        fontSize: 8.6,
+                        letterSpacing: 2.2,
+                        color: AppColors.textTertiary(brightness),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               if (trailing != null) trailing!,
             ],
           ),
-          const SizedBox(height: 10),
-          const ThinDivider(thickness: 0.8),
+          const SizedBox(height: 12),
+          ThinDivider(color: line, thickness: 0.8),
         ],
       ),
     );

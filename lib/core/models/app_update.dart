@@ -67,7 +67,8 @@ class AppVersionInfo {
 
   /// 解析 GitHub Releases 的 `releases/latest` 返回体。
   static AppVersionInfo? fromGitHubRelease(Map<String, dynamic> json) {
-    final String tag = (json['tag_name'] ?? json['name'] ?? '').toString().trim();
+    final String tag =
+        (json['tag_name'] ?? json['name'] ?? '').toString().trim();
     final String name = tag.replaceFirst(RegExp(r'^[vV]'), '').trim();
     if (name.isEmpty) {
       return null;

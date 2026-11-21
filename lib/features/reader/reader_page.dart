@@ -10,17 +10,20 @@ import '../../core/models/chapter.dart';
 import '../../core/models/reading_preferences.dart';
 import '../../core/settings/app_settings.dart';
 import '../../core/services/book_repository.dart';
+import '../../core/services/bookmark_repository.dart';
 import '../../core/services/chapter_repository.dart';
 import '../../core/services/excerpt_repository.dart';
 import '../../core/services/quote_repository.dart';
 import '../../core/services/reading_preferences_repository.dart';
 import '../../core/services/reading_stats_repository.dart';
+import '../../core/services/reading_time_service.dart';
 import '../../core/services/user_profile_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/image_picker_helper.dart';
 import '../../core/widgets/frosted_glass.dart';
 import '../../core/widgets/glass_dialog.dart';
+import '../../core/widgets/glass_input.dart';
 import '../../core/widgets/grid_background.dart';
 import '../../core/widgets/liquid_glass.dart';
 import '../../core/widgets/page_top_bar.dart';
@@ -58,7 +61,7 @@ class ReaderPage extends StatefulWidget {
   State<ReaderPage> createState() => _ReaderPageState();
 }
 
-class _ReaderPageState extends State<ReaderPage> {
+class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
   static const Duration _turnDuration = Duration(milliseconds: 340);
 
   ReaderController? _controller;
@@ -83,18 +86,36 @@ class _ReaderPageState extends State<ReaderPage> {
   bool _positionSyncQueued = false;
   String? _hint;
   Timer? _hintTimer;
-  Timer? _quoteTimer;
 
   /// 阅读时长累加：进入阅读页开始计时，每 30 秒与退出时各结算一次。
   ReadingStatsRepository? _readingStats;
   DateTime? _sessionStart;
   Timer? _timeFlushTimer;
 
+  /// 单本书累计阅读时长（榜单排序与详情页展示的数据源）。
+  ReadingTimeService? _readingTime;
+  BookmarkRepository? _bookmarks;
+
+  /// 分页模式下淡入 / 无动画时使用的当前页序号。
+  int _fadeIndex = 0;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scroll.addListener(_handleScroll);
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startReadingClock();
+      _readingTime?.start(widget.book.number);
+      return;
+    }
+    _flushReadingSeconds();
+    _readingTime?.flush();
   }
 
   @override
@@ -113,6 +134,9 @@ class _ReaderPageState extends State<ReaderPage> {
       initialChapterIndex: widget.chapterIndex,
     );
     _readingStats = context.read<ReadingStatsRepository>();
+    _readingTime = context.read<ReadingTimeService>();
+    _bookmarks = context.read<BookmarkRepository>();
+    _readingTime?.start(widget.book.number);
     _bootstrap();
   }
 
@@ -130,12 +154,6 @@ class _ReaderPageState extends State<ReaderPage> {
     _percent.value = controller.progressPercent;
     setState(() => _loaded = true);
     WidgetsBinding.instance.addPostFrameCallback((_) => _restorePosition());
-    _quoteTimer = Timer.periodic(const Duration(seconds: 26), (Timer timer) {
-      if (!mounted || !_immersive) {
-        return;
-      }
-      _controller?.rotateQuote();
-    });
     _startReadingClock();
   }
 
@@ -167,9 +185,10 @@ class _ReaderPageState extends State<ReaderPage> {
   @override
   void dispose() {
     _flushReadingSeconds();
+    _readingTime?.flush();
     _timeFlushTimer?.cancel();
     _hintTimer?.cancel();
-    _quoteTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _scroll.removeListener(_handleScroll);
     _scroll.dispose();
@@ -209,12 +228,6 @@ class _ReaderPageState extends State<ReaderPage> {
     if (controller == null || !_scroll.hasClients) {
       return;
     }
-    final ScrollPosition position = _scroll.position;
-    final double max = position.maxScrollExtent;
-    final double ratio =
-        max <= 0 ? 1.0 : (position.pixels / max).clamp(0.0, 1.0).toDouble();
-    controller.updateProgress(ratio);
-    _percent.value = controller.progressPercent;
 
     if (_positionSyncQueued) {
       return;
@@ -228,6 +241,39 @@ class _ReaderPageState extends State<ReaderPage> {
       _syncReadingPosition();
       _detectChapterEnding();
     });
+  }
+
+  /// 当前章节在整本里的相对进度（卷内进度）。
+  ///
+  /// 只看「当前这一章已经读掉了多少」，再折算成全书位置，
+  /// 这样滚到底部时不会因为 maxScrollExtent 归零而误报 100%。
+  double _chapterRatio(int chapterIndex) {
+    final RenderBox? area = _listRenderBox();
+    if (area == null) {
+      return 0;
+    }
+    final RenderBox? top = _chapterKeyBox(chapterIndex);
+    if (top == null) {
+      return 0;
+    }
+    final double viewport = area.size.height;
+    final double probe = viewport * 0.28;
+    final double topY = top.localToGlobal(Offset.zero, ancestor: area).dy;
+    final RenderBox? nextBox = _chapterKeyBox(chapterIndex + 1);
+    final double bottomY = nextBox == null
+        ? topY + top.size.height
+        : nextBox.localToGlobal(Offset.zero, ancestor: area).dy;
+    final double length = (bottomY - topY).clamp(1.0, double.infinity);
+    return ((probe - topY) / length).clamp(0.0, 1.0).toDouble();
+  }
+
+  RenderBox? _chapterKeyBox(int index) {
+    if (index < 0 || index >= _chapterKeys.length) {
+      return null;
+    }
+    final BuildContext? context = _chapterKeys[index].currentContext;
+    final RenderObject? object = context?.findRenderObject();
+    return object is RenderBox ? object : null;
   }
 
   RenderBox? _listRenderBox() {
@@ -289,6 +335,19 @@ class _ReaderPageState extends State<ReaderPage> {
     }
     if (candidate != controller.currentChapter) {
       controller.setCurrentChapter(candidate);
+    }
+
+    // 进度按「卷内位置」折算：本卷已读的章节 + 当前章读掉的比例。
+    final int total = controller.chapterCount;
+    if (total > 0) {
+      final double ratio = ((candidate + _chapterRatio(candidate)) / total)
+          .clamp(0.0, 1.0)
+          .toDouble();
+      controller.updateProgress(ratio);
+      final int percent = controller.progressPercent;
+      if (_percent.value != percent) {
+        _percent.value = percent;
+      }
     }
   }
 
@@ -375,19 +434,82 @@ class _ReaderPageState extends State<ReaderPage> {
     }
   }
 
+  /// 只属于「一级大章」的章节下标。
+  ///
+  /// 目录里既有「第一卷」这类大章、又有它下面的小节时，上一章/下一章
+  /// 只在这层大章之间跳；目录本身仍是完整列表。
+  List<int> _majorChapterIndices() {
+    final ReaderController? controller = _controller;
+    if (controller == null || controller.chapterCount == 0) {
+      return const <int>[];
+    }
+    final List<Chapter> chapters = controller.chapters;
+    final RegExp majorPattern = RegExp(
+      r'^\s*(第\s*[0-9０-９零一二三四五六七八九十百千两]+\s*[卷部篇集]|'
+      r'[Vv]ol(?:ume)?\.?\s*[0-9]+|[Pp]art\s*[0-9]+)',
+    );
+    final List<int> majors = <int>[];
+    for (int i = 0; i < chapters.length; i++) {
+      if (majorPattern.hasMatch(chapters[i].title)) {
+        majors.add(i);
+      }
+    }
+    if (majors.length < 2) {
+      // 没有卷/部层级，整本书就是一层，按顺序走。
+      return List<int>.generate(chapters.length, (int i) => i);
+    }
+    if (majors.first != 0) {
+      majors.insert(0, 0);
+    }
+    return majors;
+  }
+
   void _stepChapter(int delta) {
     final ReaderController? controller = _controller;
     if (controller == null) {
       return;
     }
-    final int target = controller.currentChapter + delta;
-    if (target < 0) {
-      _showHint('已经是第一章了');
+    final List<int> majors = _majorChapterIndices();
+    if (majors.isEmpty) {
       return;
     }
-    if (target >= controller.chapterCount) {
-      _showHint('已经是最后一章了');
-      return;
+    final int current = controller.currentChapter;
+    int target;
+    if (majors.contains(current)) {
+      final int at = majors.indexOf(current);
+      final int next = at + delta;
+      if (next < 0) {
+        _showHint('已经是第一章了');
+        return;
+      }
+      if (next >= majors.length) {
+        _showHint('已经是最后一章了');
+        return;
+      }
+      target = majors[next];
+    } else {
+      // 停在大章内部的小节上：往前找最近的大章边界。
+      if (delta > 0) {
+        final int next = majors.firstWhere(
+          (int index) => index > current,
+          orElse: () => -1,
+        );
+        if (next < 0) {
+          _showHint('已经是最后一章了');
+          return;
+        }
+        target = next;
+      } else {
+        final int next = majors.lastWhere(
+          (int index) => index < current,
+          orElse: () => -1,
+        );
+        if (next < 0) {
+          _showHint('已经是第一章了');
+          return;
+        }
+        target = next;
+      }
     }
     _goToChapter(target);
   }
@@ -428,6 +550,19 @@ class _ReaderPageState extends State<ReaderPage> {
       return;
     }
     if (controller.preferences.pageMode == ReaderPageMode.horizontal) {
+      // 淡入 / 无动画模式不走 PageView，直接切换当前页序号。
+      if (controller.preferences.turnAnimation != ReaderTurnAnimation.slide) {
+        if (forward) {
+          if (_fadeIndex + 1 < _slices.length) {
+            _setFadeIndex(_fadeIndex + 1);
+          } else {
+            _showHint('已经是最后一页了');
+          }
+        } else if (_fadeIndex > 0) {
+          _setFadeIndex(_fadeIndex - 1);
+        }
+        return;
+      }
       final PageController? pages = _pages;
       if (pages == null || !pages.hasClients) {
         return;
@@ -453,6 +588,24 @@ class _ReaderPageState extends State<ReaderPage> {
         .toDouble();
     _scroll.animateTo(target,
         duration: _turnDuration, curve: Curves.easeOutCubic);
+  }
+
+  /// 淡入 / 无动画模式下的翻页。
+  void _setFadeIndex(int index) {
+    final ReaderController? controller = _controller;
+    if (controller == null || index < 0 || index >= _slices.length) {
+      return;
+    }
+    setState(() => _fadeIndex = index);
+    final _ReaderSlice slice = _slices[index];
+    controller.setCurrentChapter(slice.chapterIndex);
+    final double ratio =
+        _slices.length <= 1 ? 1.0 : index / (_slices.length - 1);
+    controller.updateProgress(ratio);
+    _percent.value = controller.progressPercent;
+    if (index == _slices.length - 1) {
+      _showHint('本章节已读完了哦！');
+    }
   }
 
   bool _handleKeyEvent(KeyEvent event) {
@@ -677,6 +830,13 @@ class _ReaderPageState extends State<ReaderPage> {
               },
             ),
             GlassDialogButton(
+              label: '添加书签',
+              onTap: () {
+                Navigator.of(context).pop();
+                _addBookmark();
+              },
+            ),
+            GlassDialogButton(
               label: '阅读设置',
               onTap: () {
                 Navigator.of(context).pop();
@@ -689,6 +849,93 @@ class _ReaderPageState extends State<ReaderPage> {
               onTap: () {
                 Navigator.of(context).pop();
                 _toggleImmersive();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// 当前阅读位置（0..1），书签与进度共用同一套比例。
+  double _currentRatio() {
+    final ReaderController? controller = _controller;
+    if (controller == null) {
+      return 0;
+    }
+    if (controller.preferences.pageMode == ReaderPageMode.horizontal) {
+      if (_slices.length <= 1) {
+        return 0;
+      }
+      return (_pageIndex / (_slices.length - 1)).clamp(0.0, 1.0);
+    }
+    if (_scroll.hasClients) {
+      final ScrollPosition position = _scroll.position;
+      if (position.maxScrollExtent > 0) {
+        return (position.pixels / position.maxScrollExtent).clamp(0.0, 1.0);
+      }
+    }
+    return 0;
+  }
+
+  Future<void> _addBookmark() async {
+    final ReaderController? controller = _controller;
+    final BookmarkRepository? repo = _bookmarks;
+    if (controller == null || repo == null) {
+      return;
+    }
+    final String? note = await showGlassInputDialog(
+      context: context,
+      title: '添加书签',
+      english: 'ADD BOOKMARK',
+      hint: '给这一页写一句备注（可留空）',
+      confirmLabel: '保存',
+    );
+    if (note == null) {
+      return;
+    }
+    await repo.add(
+      bookNumber: controller.book.number,
+      chapterIndex: controller.currentChapter,
+      chapterTitle: controller.chapterTitle,
+      ratio: _currentRatio(),
+      note: note,
+    );
+    if (!mounted) {
+      return;
+    }
+    _showHint('书签已保存');
+  }
+
+  /// 正文段落：长按选中后仅提供「复制」，保持原始需求的轻量操作。
+  Widget _buildSelectableParagraph(
+    String text,
+    ReadingPreferences prefs,
+    Color textColor,
+  ) {
+    return SelectableText(
+      text,
+      textAlign: TextAlign.justify,
+      style: TextStyle(
+        fontSize: prefs.fontSize,
+        height: prefs.lineHeight,
+        letterSpacing: 0.2,
+        color: textColor,
+        // 正文跟随设置里的字体来源；大标题一律走宋体，不受这里影响。
+        fontFamily: context.watch<AppSettingsController>().fontFamilyOverride,
+      ),
+      contextMenuBuilder: (BuildContext context, EditableTextState state) {
+        final TextEditingValue value = state.textEditingValue;
+        final String selected = value.selection.textInside(value.text).trim();
+        return AdaptiveTextSelectionToolbar.buttonItems(
+          anchors: state.contextMenuAnchors,
+          buttonItems: <ContextMenuButtonItem>[
+            ContextMenuButtonItem(
+              label: '复制',
+              onPressed: () {
+                ContextMenuController.removeAny();
+                Clipboard.setData(ClipboardData(text: selected));
+                state.hideToolbar();
               },
             ),
           ],
@@ -895,16 +1142,7 @@ class _ReaderPageState extends State<ReaderPage> {
         ),
         const SizedBox(height: 18),
         for (int i = 0; i < paragraphs.length; i++) ...<Widget>[
-          SelectableText(
-            paragraphs[i],
-            textAlign: TextAlign.justify,
-            style: TextStyle(
-              fontSize: prefs.fontSize,
-              height: prefs.lineHeight,
-              letterSpacing: 0.2,
-              color: textColor,
-            ),
-          ),
+          _buildSelectableParagraph(paragraphs[i], prefs, textColor),
           if (i != paragraphs.length - 1)
             SizedBox(height: prefs.paragraphSpacing),
         ],
@@ -1023,6 +1261,24 @@ class _ReaderPageState extends State<ReaderPage> {
         ReaderBackgroundView.textColor(controller.backgroundId);
     final Color subColor =
         ReaderBackgroundView.secondaryTextColor(controller.backgroundId);
+
+    // 淡入 / 无动画：单页渲染 + 切换，不再使用 PageView。
+    if (controller.preferences.turnAnimation != ReaderTurnAnimation.slide) {
+      final int index =
+          _slices.isEmpty ? 0 : _fadeIndex.clamp(0, _slices.length - 1);
+      final Widget page =
+          _buildSlice(controller, _slices[index], textColor, subColor);
+      if (controller.preferences.turnAnimation == ReaderTurnAnimation.none) {
+        return page;
+      }
+      return AnimatedSwitcher(
+        duration: AppSettingsController.motion(240),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: KeyedSubtree(key: ValueKey<int>(index), child: page),
+      );
+    }
+
     return PageView.builder(
       controller: pages,
       itemCount: _slices.length,
@@ -1095,16 +1351,7 @@ class _ReaderPageState extends State<ReaderPage> {
               ),
               const SizedBox(height: 16),
             ],
-            SelectableText(
-              slice.text,
-              textAlign: TextAlign.justify,
-              style: TextStyle(
-                fontSize: prefs.fontSize,
-                height: prefs.lineHeight,
-                letterSpacing: 0.2,
-                color: textColor,
-              ),
-            ),
+            _buildSelectableParagraph(slice.text, prefs, textColor),
             if (slice.isLastOfBook)
               _buildFinishBlock(controller, textColor, subColor),
           ],
@@ -1157,6 +1404,18 @@ class _ReaderPageState extends State<ReaderPage> {
                         child: _buildReadingSurface(controller, size),
                       ),
                     ),
+                    // 背景压暗：阅读设置里的「背景微调」。
+                    if (controller.preferences.backgroundDim > 0)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: ColoredBox(
+                            color: AppColors.alpha(
+                              Colors.black,
+                              controller.preferences.backgroundDim / 100,
+                            ),
+                          ),
+                        ),
+                      ),
                     // 阅读水印：设置页开关打开后才出现，默认关闭，保持整页干净。
                     if (settings.watermarkEnabled)
                       Positioned.fill(
@@ -1188,9 +1447,12 @@ class _ReaderPageState extends State<ReaderPage> {
                         left: 18,
                         right: 18,
                         bottom: 12,
-                        child: QuoteStrip(
-                          quote: controller.quote,
-                          backgroundId: controller.backgroundId,
+                        // 名言条只做展示：点击不切换名言，交给下层阅读区处理。
+                        child: IgnorePointer(
+                          child: QuoteStrip(
+                            quote: controller.quote,
+                            backgroundId: controller.backgroundId,
+                          ),
                         ),
                       ),
                     Positioned(
@@ -1230,7 +1492,7 @@ class _ReaderPageState extends State<ReaderPage> {
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: AppColors.alpha(dark ? Colors.black : Colors.white, 0.05),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: AppColors.alpha(dark ? Colors.white : Colors.black, 0.13),
             width: 0.8,

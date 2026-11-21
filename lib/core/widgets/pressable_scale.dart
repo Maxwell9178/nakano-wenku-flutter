@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../settings/app_settings.dart';
+
 /// 全局按钮点击反馈。
 ///
 /// 需求：按钮被点击时先向内微缩，随后回弹，再执行页面跳转等业务逻辑；
@@ -79,10 +81,8 @@ class _PressableScaleState extends State<PressableScale> {
       onLongPress: interactive ? widget.onLongPress : null,
       child: AnimatedScale(
         scale: _pressed ? widget.pressedScale : 1.0,
-        // 按下快、回弹慢且带一点过冲，形成「液态」手感。
-        duration: _pressed
-            ? const Duration(milliseconds: 110)
-            : const Duration(milliseconds: 320),
+        // 减少动画开启时直接跳过过渡；30Hz 帧率下过渡放慢，手感更连续。
+        duration: AppSettingsController.motion(_pressed ? 110 : 320),
         curve: _pressed ? Curves.easeOutCubic : Curves.easeOutBack,
         child: widget.child,
       ),

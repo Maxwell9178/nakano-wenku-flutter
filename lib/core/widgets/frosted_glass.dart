@@ -63,7 +63,7 @@ class FrostedGlass extends StatelessWidget {
 
     final Color borderColor = AppColors.alpha(
       Colors.white,
-      isDark ? 0.16 : 0.55,
+      isDark ? 0.20 : 0.62,
     );
 
     Widget surface = ClipRRect(
@@ -79,6 +79,25 @@ class FrostedGlass extends StatelessWidget {
             ),
           Positioned.fill(
             child: DecoratedBox(decoration: BoxDecoration(color: fill)),
+          ),
+          // 极轻的顶部高光：让厚面板也有玻璃边缘，而不是纯色块。
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: <Color>[
+                      AppColors.alpha(Colors.white, isDark ? 0.08 : 0.22),
+                      Colors.transparent,
+                      AppColors.alpha(Colors.black, isDark ? 0.10 : 0.02),
+                    ],
+                    stops: const <double>[0.0, 0.35, 1.0],
+                  ),
+                ),
+              ),
+            ),
           ),
           Padding(padding: padding, child: child),
         ],

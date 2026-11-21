@@ -98,7 +98,8 @@ class _BookListPageState extends State<BookListPage> {
   }
 
   Future<void> _openDetail(Book book) async {
-    await Navigator.of(context).pushNamed(AppRoutes.bookDetail, arguments: book);
+    await Navigator.of(context)
+        .pushNamed(AppRoutes.bookDetail, arguments: book);
     if (mounted) {
       _reload();
     }

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../../core/models/reading_preferences.dart';
+import '../../../core/settings/app_settings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/confirm_dialog.dart';
@@ -349,6 +350,18 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
                 _update(_prefs.copyWith(paragraphSpacing: value)),
           ),
         ),
+        _SliderRow(
+          label: '背景微调',
+          english: 'BACKGROUND DIM',
+          valueText: '${_prefs.backgroundDim}%',
+          child: GlassSlider(
+            value: _prefs.backgroundDim.toDouble(),
+            min: ReadingPreferences.backgroundDimMin.toDouble(),
+            max: ReadingPreferences.backgroundDimMax.toDouble(),
+            onChanged: (double value) =>
+                _update(_prefs.copyWith(backgroundDim: value.round())),
+          ),
+        ),
       ],
     );
   }
@@ -374,7 +387,7 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
               width: 50,
               height: 62,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: AppColors.alpha(
                     AppColors.textPrimary(brightness),
@@ -486,7 +499,7 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
                     height: 44,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(16),
                       color: selected
                           ? AppColors.alpha(AppColors.accent(brightness), 0.13)
                           : AppColors.alpha(
@@ -511,6 +524,63 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
                       style: TextStyle(
                         fontSize: 12.5,
                         letterSpacing: 0.8,
+                        fontWeight:
+                            selected ? FontWeight.w600 : FontWeight.w400,
+                        color: selected
+                            ? AppColors.accent(brightness)
+                            : AppColors.textSecondary(brightness),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 20),
+        _SectionTitle(title: '翻页动画', english: 'TURN ANIMATION'),
+        const SizedBox(height: 10),
+        Row(
+          children: ReaderTurnAnimation.values.map((ReaderTurnAnimation mode) {
+            final bool selected = _prefs.turnAnimation == mode;
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  right: mode == ReaderTurnAnimation.none ? 0 : 8,
+                ),
+                child: PressableScale(
+                  pressedScale: 0.96,
+                  onTap: () => _update(_prefs.copyWith(turnAnimation: mode)),
+                  child: AnimatedContainer(
+                    duration: AppSettingsController.motion(220),
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      color: selected
+                          ? AppColors.alpha(AppColors.accent(brightness), 0.13)
+                          : AppColors.alpha(
+                              AppColors.textPrimary(brightness),
+                              0.03,
+                            ),
+                      border: Border.all(
+                        color: selected
+                            ? AppColors.alpha(
+                                AppColors.accent(brightness),
+                                0.55,
+                              )
+                            : AppColors.alpha(
+                                AppColors.textPrimary(brightness),
+                                0.12,
+                              ),
+                        width: 0.9,
+                      ),
+                    ),
+                    child: Text(
+                      mode.label,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        letterSpacing: 0.6,
                         fontWeight:
                             selected ? FontWeight.w600 : FontWeight.w400,
                         color: selected
@@ -674,7 +744,7 @@ class _QuickChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: AppColors.alpha(AppColors.textPrimary(brightness), 0.16),
             width: 0.8,
@@ -765,7 +835,7 @@ class _GlassSwitch extends StatelessWidget {
         height: 25,
         padding: const EdgeInsets.symmetric(horizontal: 3),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(13),
+          borderRadius: BorderRadius.circular(16),
           color: value
               ? AppColors.alpha(accent, 0.30)
               : AppColors.alpha(AppColors.textPrimary(brightness), 0.08),
@@ -834,7 +904,7 @@ class _BackgroundTile extends StatelessWidget {
               width: 50,
               height: 62,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: selected
                       ? AppColors.accent(brightness)
@@ -858,7 +928,7 @@ class _BackgroundTile extends StatelessWidget {
                     : null,
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(9),
+                borderRadius: BorderRadius.circular(12),
                 child: Stack(
                   fit: StackFit.expand,
                   children: <Widget>[

@@ -70,8 +70,8 @@ class ReaderController extends ChangeNotifier {
   bool get hasChapters => _chapters.isNotEmpty;
   int get chapterCount => _chapters.length;
   int get currentChapter => _currentChapter;
-  bool get isLastChapter => _chapters.isNotEmpty &&
-      _currentChapter >= _chapters.length - 1;
+  bool get isLastChapter =>
+      _chapters.isNotEmpty && _currentChapter >= _chapters.length - 1;
   bool get isFinished => _book.isFinished;
 
   /// 当前章节标题（越界时给出兜底文案）。
@@ -173,6 +173,8 @@ class ReaderController extends ChangeNotifier {
       return;
     }
     _currentChapter = next;
+    // 换章时顺带换一条名言（只读取本地名言名句.txt，不提供手动切换入口）。
+    rotateQuote();
     notifyListeners();
     _schedulePersist();
   }
@@ -230,8 +232,7 @@ class ReaderController extends ChangeNotifier {
     }
     final int index = (chapterIndex ?? _currentChapter)
         .clamp(0, _chapters.isEmpty ? 0 : _chapters.length - 1);
-    final String title =
-        _chapters.isEmpty ? '正文' : _chapters[index].title;
+    final String title = _chapters.isEmpty ? '正文' : _chapters[index].title;
     return _excerptRepository.add(
       bookNumber: _book.number,
       bookTitle: _book.title,

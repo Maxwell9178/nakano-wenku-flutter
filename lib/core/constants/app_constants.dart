@@ -30,13 +30,51 @@ class AppConstants {
 
   // ---------------- 版本更新 ----------------
 
-  /// 主源：Gitee 仓库内的静态 version.json。
+  /// 主源：Gitee Pages 上托管的静态 version.json。
+  ///
+  /// 部署方式见工程根目录「打包与发布说明.md」：
+  /// 仓库开启 Pages 后，把 version.json 与 app-release.apk 放在部署目录根下，
+  /// 这里的地址就是 Pages 给出的公开链接。
   static const String updateManifestUrl =
+      'https://maxwell9178.gitee.io/nakano-wenku-flutter/version.json';
+
+  /// 主源兜底：仓库 raw 文件（Pages 未部署或尚未刷新时仍能读到）。
+  static const String updateRawManifestUrl =
       'https://gitee.com/Maxwell9178/nakano-wenku-flutter/raw/master/version.json';
 
   /// 备用源：GitHub Releases 最新发布接口。
   static const String updateApiUrl =
       'https://api.github.com/repos/Maxwell9178/nakano-wenku-flutter/releases/latest';
+
+  /// GitHub 仓库 raw 清单（main 分支根目录的 version.json）。
+  ///
+  /// 这条不需要 GitHub Pages、也不需要 Releases：只要把 version.json 推到 main 分支，
+  /// 立刻就能读到，是最省事的一路源。
+  static const String updateGithubRawManifestUrl =
+      'https://raw.githubusercontent.com/Maxwell9178/nakano-wenku-flutter/main/version.json';
+
+  /// GitHub 仓库 raw 的 APK 直链（清单里没有 downloadUrl 时用它）。
+  static const String updateGithubRawApkUrl =
+      'https://raw.githubusercontent.com/Maxwell9178/nakano-wenku-flutter/main/dist/app-release.apk';
+
+  /// 第二静态源：jsDelivr 代理 GitHub 仓库，国内多数网络可直连。
+  static const String updateMirrorUrl =
+      'https://cdn.jsdelivr.net/gh/Maxwell9178/nakano-wenku-flutter@main/version.json';
+
+  /// 兜底下载页：用户点「立即下载」但清单里没有直链时打开这里。
+  static const String updateReleasesPage =
+      'https://github.com/Maxwell9178/nakano-wenku-flutter/releases';
+
+  /// Gitee Pages 上的 APK 直链，与 version.json 里的 downloadUrl 保持一致。
+  static const String updateApkUrl =
+      'https://maxwell9178.gitee.io/nakano-wenku-flutter/app-release.apk';
+
+  /// 兜底 APK 直链：清单里没给 downloadUrl 时，按顺序换这些地址试。
+  static const List<String> updateApkFallbackUrls = <String>[
+    'https://github.com/Maxwell9178/nakano-wenku-flutter/releases/download/1.0.0/app-release.apk',
+    'https://github.com/Maxwell9178/nakano-wenku-flutter/releases/latest/download/app-release.apk',
+    'https://raw.githubusercontent.com/Maxwell9178/nakano-wenku-flutter/main/dist/app-release.apk',
+  ];
 
   /// 冷启动自动检测的冷却天数（手动检测不受限制）。
   static const int updateCheckCooldownDays = 7;
@@ -68,6 +106,8 @@ class AppConstants {
     'docx',
     'md',
     'zip',
+    'cbx',
+    'cbz',
   ];
 
   /// 备份包后缀（zip 改名）。

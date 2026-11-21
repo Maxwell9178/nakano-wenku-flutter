@@ -117,7 +117,8 @@ class GlassDialogCard extends StatelessWidget {
                       fontSize: 19,
                     ),
                   ),
-                  if (english != null && english!.trim().isNotEmpty) ...<Widget>[
+                  if (english != null &&
+                      english!.trim().isNotEmpty) ...<Widget>[
                     const SizedBox(height: 7),
                     Text(
                       english!.toUpperCase(),
@@ -180,7 +181,9 @@ class GlassDialogButton extends StatelessWidget {
     final Brightness brightness = Theme.of(context).brightness;
     final Color accent = danger
         ? AppColors.danger
-        : (primary ? AppColors.accent(brightness) : AppColors.textPrimary(brightness));
+        : (primary
+            ? AppColors.accent(brightness)
+            : AppColors.textPrimary(brightness));
 
     return PressableScale(
       onTap: onTap,
@@ -189,7 +192,7 @@ class GlassDialogButton extends StatelessWidget {
         height: 46,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           color: primary
               ? AppColors.alpha(accent, 0.12)
               : AppColors.alpha(accent, 0.04),

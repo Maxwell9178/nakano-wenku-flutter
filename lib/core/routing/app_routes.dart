@@ -22,6 +22,14 @@ class AppRoutes {
   /// 阅读页（预留）。
   static const String reader = '/reader';
 
+  /// 漫画阅读页（CBX / CBZ 图片包）。
+  static const String comic = '/comic';
+
+  /// 书签列表页。
+  static const String bookmarks = '/bookmarks';
+
+  /// 批注列表页。
+
   /// 导入页面（预留）。
   static const String importFiles = '/import';
 

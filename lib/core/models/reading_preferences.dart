@@ -19,6 +19,33 @@ ReaderPageMode readerPageModeFromValue(String? value) {
   );
 }
 
+/// 分页模式下的翻页动画。
+///
+/// * [slide]：随手势滑动（默认）；
+/// * [fade]：整页淡入淡出；
+/// * [none]：直接切换，不做过渡。
+enum ReaderTurnAnimation { slide, fade, none }
+
+extension ReaderTurnAnimationLabel on ReaderTurnAnimation {
+  String get label {
+    switch (this) {
+      case ReaderTurnAnimation.slide:
+        return '滑动';
+      case ReaderTurnAnimation.fade:
+        return '淡入';
+      case ReaderTurnAnimation.none:
+        return '无动画';
+    }
+  }
+}
+
+ReaderTurnAnimation readerTurnAnimationFromValue(String? value) {
+  return ReaderTurnAnimation.values.firstWhere(
+    (ReaderTurnAnimation item) => item.name == value,
+    orElse: () => ReaderTurnAnimation.slide,
+  );
+}
+
 /// 阅读背景。
 ///
 /// 内置背景用固定 id 描述（不占存储、不依赖图片文件）；
@@ -108,6 +135,8 @@ class ReadingPreferences {
     this.longPressMenu = true,
     this.volumeKeyTurn = false,
     this.defaultBackgroundId = '',
+    this.turnAnimation = ReaderTurnAnimation.slide,
+    this.backgroundDim = 0,
   });
 
   // 取值范围（与需求文档一致，设置页滑块共用同一份限制）。
@@ -150,6 +179,13 @@ class ReadingPreferences {
   /// 单本书在阅读页单独换过背景后，以那本书自己的记录优先。
   final String defaultBackgroundId;
 
+  /// 翻页动画模式与背景压暗程度（0-70，越大越暗）。
+  final ReaderTurnAnimation turnAnimation;
+  final int backgroundDim;
+
+  static const int backgroundDimMin = 0;
+  static const int backgroundDimMax = 70;
+
   ReadingPreferences copyWith({
     double? fontSize,
     double? lineHeight,
@@ -163,6 +199,8 @@ class ReadingPreferences {
     bool? longPressMenu,
     bool? volumeKeyTurn,
     String? defaultBackgroundId,
+    ReaderTurnAnimation? turnAnimation,
+    int? backgroundDim,
   }) {
     return ReadingPreferences(
       fontSize: _clamp(fontSize ?? this.fontSize, fontSizeMin, fontSizeMax),
@@ -184,6 +222,9 @@ class ReadingPreferences {
       longPressMenu: longPressMenu ?? this.longPressMenu,
       volumeKeyTurn: volumeKeyTurn ?? this.volumeKeyTurn,
       defaultBackgroundId: defaultBackgroundId ?? this.defaultBackgroundId,
+      turnAnimation: turnAnimation ?? this.turnAnimation,
+      backgroundDim: (backgroundDim ?? this.backgroundDim)
+          .clamp(backgroundDimMin, backgroundDimMax),
     );
   }
 
@@ -200,6 +241,8 @@ class ReadingPreferences {
         'longPressMenu': longPressMenu,
         'volumeKeyTurn': volumeKeyTurn,
         'defaultBackgroundId': defaultBackgroundId,
+        'turnAnimation': turnAnimation.name,
+        'backgroundDim': backgroundDim,
       };
 
   factory ReadingPreferences.fromJson(Map<String, dynamic> json) {
@@ -244,6 +287,13 @@ class ReadingPreferences {
       tapToTurnPage: _asBool(json['tapToTurnPage'], defaults.tapToTurnPage),
       longPressMenu: _asBool(json['longPressMenu'], defaults.longPressMenu),
       volumeKeyTurn: _asBool(json['volumeKeyTurn'], defaults.volumeKeyTurn),
+      turnAnimation:
+          readerTurnAnimationFromValue(json['turnAnimation'] as String?),
+      backgroundDim: _clampInt(
+        _asInt(json['backgroundDim'], defaults.backgroundDim),
+        backgroundDimMin,
+        backgroundDimMax,
+      ),
       defaultBackgroundId:
           (json['defaultBackgroundId'] as String?)?.trim() ?? '',
     );
@@ -274,4 +324,27 @@ bool _asBool(dynamic value, bool fallback) {
     return value;
   }
   return fallback;
+}
+
+int _asInt(dynamic value, int fallback) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.round();
+  }
+  if (value is String) {
+    return int.tryParse(value) ?? fallback;
+  }
+  return fallback;
+}
+
+int _clampInt(int value, int min, int max) {
+  if (value < min) {
+    return min;
+  }
+  if (value > max) {
+    return max;
+  }
+  return value;
 }

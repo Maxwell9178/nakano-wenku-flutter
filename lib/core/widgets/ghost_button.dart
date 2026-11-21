@@ -104,7 +104,7 @@ class GhostButton extends StatelessWidget {
       width: expand ? double.infinity : null,
       padding: padding,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor, width: 0.9),
         color: AppColors.alpha(accentColor, 0.035),
       ),

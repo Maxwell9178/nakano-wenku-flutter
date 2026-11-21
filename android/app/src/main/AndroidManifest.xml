@@ -48,6 +48,17 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!--
+            毛玻璃界面大量使用 BackdropFilter：部分 GPU 在 release 的 Impeller
+            渲染管线下会出现掉帧/闪烁，这里回退到 Skia，保证发布版观感稳定。
+        -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
+        <!-- 图片与章节都在私有目录，关闭不必要的抽取以减少冷启动耗时。 -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableDartProfiling"
+            android:value="false" />
     </application>
 
     <!-- 支持直接打开 .wkarchive（本质是 zip）：声明为通用压缩包类型。 -->

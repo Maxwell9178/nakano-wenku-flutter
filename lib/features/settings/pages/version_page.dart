@@ -15,6 +15,7 @@ import '../../../core/widgets/page_top_bar.dart';
 import '../../../core/widgets/pressable_scale.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/thin_divider.dart';
+import '../widgets/app_share_card.dart';
 import '../widgets/update_dialog.dart';
 
 /// 版本页。
@@ -80,7 +81,8 @@ class _VersionPageState extends State<VersionPage> {
       showSoftMessage(context, '已经是最新版本啦');
       return;
     }
-    showSoftMessage(context, '检查更新失败，请稍后再试');
+    // 失败保持静默：卡片内已展示「暂时无法连接版本服务器」与最近一次检测时间，
+    // 不再额外弹提示，避免离线时反复打扰。
   }
 
   Future<void> _download(AppVersionInfo info) async {
@@ -122,10 +124,12 @@ class _VersionPageState extends State<VersionPage> {
                   padding: const EdgeInsets.fromLTRB(24, 18, 24, 40),
                   children: <Widget>[
                     _buildIdentityCard(brightness),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 30),
                     _buildUpdateCard(brightness),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 30),
                     _buildTestChannelCard(brightness),
+                    const SizedBox(height: 30),
+                    _buildShareCard(brightness),
                   ],
                 ),
               ),
@@ -155,7 +159,7 @@ class _VersionPageState extends State<VersionPage> {
                 width: 74,
                 height: 74,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(24),
                   border: Border.all(
                     color: AppColors.alpha(accent, 0.24),
                     width: 0.9,
@@ -291,6 +295,39 @@ class _VersionPageState extends State<VersionPage> {
   }
 
   // ---------------- 测试版渠道 ----------------
+
+  Widget _buildShareCard(Brightness brightness) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const SectionHeader(title: '分享软件', english: 'SHARE'),
+        const SizedBox(height: 12),
+        LiquidGlass(
+          borderRadius: 24,
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                '生成一张软件卡片，可以直接发给朋友。图片完全在本机绘制，'
+                '不会上传任何内容。',
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.7,
+                  color: AppColors.textSecondary(brightness),
+                ),
+              ),
+              const SizedBox(height: 14),
+              GhostButton(
+                label: '生成分享卡片',
+                onTap: () => showAppShareDialog(context),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildTestChannelCard(Brightness brightness) {
     return Column(

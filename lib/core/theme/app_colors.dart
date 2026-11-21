@@ -6,8 +6,7 @@ import 'package:flutter/material.dart';
 /// 1. 浅色模式为「柔和白」，刻意避开偏黄的奶白；
 /// 2. 深色模式为「纯深黑」；
 /// 3. 两种模式都存在灰色网格纹理；
-/// 4. 配色需要有层次，不能只有黑白，因此额外提供复古金（accent）
-///    与墨青（secondary）两个辅助色，用于高亮、分割线、选中态。
+/// 4. 所有分割线、图标线条只用白色 / 浅灰色，不再出现金色系。
 class AppColors {
   const AppColors._();
 
@@ -40,13 +39,14 @@ class AppColors {
 
   // ---------------- 辅助色 ----------------
 
-  /// 复古暗金：高亮、分割线、选中态。
-  static const Color accentLight = Color(0xFF8A6A3C);
-  static const Color accentDark = Color(0xFFC9A66B);
+  /// 高亮 / 选中态 / 装饰线：中性灰，浅色模式用深灰保证可见，
+  /// 深色模式用近白灰，彻底移除此前的复古金。
+  static const Color accentLight = Color(0xFF5C5C56);
+  static const Color accentDark = Color(0xFFE7E7E2);
 
-  /// 墨青：次级高亮，避免配色单调。
-  static const Color secondaryLight = Color(0xFF3F5F5A);
-  static const Color secondaryDark = Color(0xFF7FA8A0);
+  /// 次级高亮：同样收敛为中性灰，避免抢主色。
+  static const Color secondaryLight = Color(0xFF8C8C86);
+  static const Color secondaryDark = Color(0xFFBFBFB9);
 
   /// 危险操作（删除账号等）使用。
   static const Color danger = Color(0xFFB3261E);
@@ -77,16 +77,15 @@ class AppColors {
         : alpha(Colors.black, 0.055);
   }
 
-  /// 细分割线颜色。
+  /// 细分割线颜色：需要肉眼可辨，因此不再压到极低透明度。
   static Color divider(Brightness brightness) {
     return brightness == Brightness.dark
-        ? alpha(Colors.white, 0.14)
-        : alpha(Colors.black, 0.11);
+        ? alpha(Colors.white, 0.22)
+        : alpha(Colors.black, 0.18);
   }
 
-  static Color background(Brightness brightness) => brightness == Brightness.dark
-      ? darkBackground
-      : lightBackground;
+  static Color background(Brightness brightness) =>
+      brightness == Brightness.dark ? darkBackground : lightBackground;
 
   static Color backgroundDeep(Brightness brightness) =>
       brightness == Brightness.dark ? darkBackgroundDeep : lightBackgroundDeep;
@@ -103,14 +102,31 @@ class AppColors {
   static Color textTertiary(Brightness brightness) =>
       brightness == Brightness.dark ? darkTextTertiary : lightTextTertiary;
 
+  /// 装饰配色（第 3 轮新增）。
+  ///
+  /// 仅作为附加装饰效果，不修改深浅模式的原生底色；
+  /// 为空时使用默认灰阶强调色。
+  static Color? decoration;
+
   static Color accent(Brightness brightness) =>
-      brightness == Brightness.dark ? accentDark : accentLight;
+      decoration ?? (brightness == Brightness.dark ? accentDark : accentLight);
 
   static Color secondary(Brightness brightness) =>
       brightness == Brightness.dark ? secondaryDark : secondaryLight;
 
-  static Color glassTint(Brightness brightness) =>
-      brightness == Brightness.dark ? darkGlassTint : lightGlassTint;
+  static Color glassTint(Brightness brightness) {
+    final Color? tone = decoration;
+    final Color base =
+        brightness == Brightness.dark ? darkGlassTint : lightGlassTint;
+    if (tone == null) {
+      return base;
+    }
+    // 装饰色只给毛玻璃染一层薄膜，底色仍是原来的黑白灰。
+    return Color.alphaBlend(
+      alpha(tone, brightness == Brightness.dark ? 0.22 : 0.16),
+      base,
+    );
+  }
 
   static Color panelFill(Brightness brightness) =>
       brightness == Brightness.dark ? darkPanelFill : lightPanelFill;

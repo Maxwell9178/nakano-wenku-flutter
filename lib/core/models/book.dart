@@ -5,8 +5,7 @@ enum BookSeriesStatus { ongoing, completed }
 
 extension BookSeriesStatusX on BookSeriesStatus {
   /// 界面展示文案。需求要求信息区直接显示「已完结 / 连载中」。
-  String get label =>
-      this == BookSeriesStatus.completed ? '已完结' : '连载中';
+  String get label => this == BookSeriesStatus.completed ? '已完结' : '连载中';
 }
 
 /// 从本地存储的字符串还原连载状态，异常值一律回落到「连载中」。
@@ -37,6 +36,9 @@ class Book {
     this.lastChapterTitle,
     this.lastReadAt,
     this.addedAt,
+    this.totalReadMs = 0,
+    this.group,
+    this.isComic = false,
   });
 
   /// 书籍编号数字部分，界面统一展示为 NW-XXXX。
@@ -74,11 +76,37 @@ class Book {
   /// 入库时间。
   final DateTime? addedAt;
 
+  /// 本书累计阅读时长（毫秒）。第 2 轮新增，参与阅读榜单排序与备份。
+  final int totalReadMs;
+
+  /// 导入分组标签（用户自定义，可为空）。
+  final String? group;
+
+  /// 是否为漫画（CBX / CBZ 图片压缩包）。
+  final bool isComic;
+
+  /// 累计阅读时长文案：不足 1 分钟按 1 分钟计，超过 1 小时显示小时。
+  String get totalReadLabel {
+    if (totalReadMs <= 0) {
+      return '未开始阅读';
+    }
+    final int totalMinutes = totalReadMs < 60000 ? 1 : totalReadMs ~/ 60000;
+    if (totalMinutes < 60) {
+      return '$totalMinutes 分钟';
+    }
+    final int hours = totalMinutes ~/ 60;
+    final int minutes = totalMinutes % 60;
+    return minutes == 0 ? '$hours 小时' : '$hours 小时 $minutes 分钟';
+  }
+
   /// 完整编号，例如 NW-0007。
   String get id => AppConstants.formatBookId(number);
 
   /// 总字数的展示文案。
   String get wordCountLabel {
+    if (isComic) {
+      return chapterCount > 0 ? '$chapterCount 页' : '页数待解析';
+    }
     if (wordCount <= 0) {
       return '字数待解析';
     }
@@ -103,8 +131,12 @@ class Book {
     String? lastChapterTitle,
     DateTime? lastReadAt,
     DateTime? addedAt,
+    int? totalReadMs,
+    String? group,
+    bool? isComic,
     bool clearCoverPath = false,
     bool clearLastChapterTitle = false,
+    bool clearGroup = false,
   }) {
     return Book(
       number: number ?? this.number,
@@ -117,10 +149,14 @@ class Book {
       seriesStatus: seriesStatus ?? this.seriesStatus,
       isFinished: isFinished ?? this.isFinished,
       progress: progress ?? this.progress,
-      lastChapterTitle:
-          clearLastChapterTitle ? null : (lastChapterTitle ?? this.lastChapterTitle),
+      lastChapterTitle: clearLastChapterTitle
+          ? null
+          : (lastChapterTitle ?? this.lastChapterTitle),
       lastReadAt: lastReadAt ?? this.lastReadAt,
       addedAt: addedAt ?? this.addedAt,
+      totalReadMs: totalReadMs ?? this.totalReadMs,
+      group: clearGroup ? null : (group ?? this.group),
+      isComic: isComic ?? this.isComic,
     );
   }
 
@@ -139,6 +175,9 @@ class Book {
       'lastChapterTitle': lastChapterTitle,
       'lastReadAt': lastReadAt?.millisecondsSinceEpoch,
       'addedAt': addedAt?.millisecondsSinceEpoch,
+      'totalReadMs': totalReadMs,
+      'group': group,
+      'isComic': isComic,
     };
   }
 
@@ -170,6 +209,9 @@ class Book {
       lastChapterTitle: _asNullableString(json['lastChapterTitle']),
       lastReadAt: _asDateTime(json['lastReadAt']),
       addedAt: _asDateTime(json['addedAt']),
+      totalReadMs: _asInt(json['totalReadMs'], 0),
+      group: _asNullableString(json['group']),
+      isComic: json['isComic'] == true,
     );
   }
 

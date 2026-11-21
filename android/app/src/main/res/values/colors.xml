@@ -2,4 +2,6 @@
 <resources>
     <!-- 与 Flutter 层 AppColors.lightBackground 保持一致（柔和白）。 -->
     <color name="app_background_light">#F4F4F1</color>
+    <!-- 深色开屏底色：纯黑，与 Flutter 层深色底一致。 -->
+    <color name="app_background_dark">#000000</color>
 </resources>

@@ -45,8 +45,9 @@ class Chapter {
     final dynamic rawContent = json['content'];
     final String content = rawContent is String ? rawContent : '';
     final dynamic rawTitle = json['title'];
-    final String title =
-        rawTitle is String && rawTitle.trim().isNotEmpty ? rawTitle.trim() : '未命名章节';
+    final String title = rawTitle is String && rawTitle.trim().isNotEmpty
+        ? rawTitle.trim()
+        : '未命名章节';
     final dynamic rawCount = json['wordCount'];
 
     return Chapter(

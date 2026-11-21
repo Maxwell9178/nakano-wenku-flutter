@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/app_constants.dart';
@@ -70,6 +71,9 @@ class UpdateService {
   /// 单次请求超时。
   static const Duration _requestTimeout = Duration(seconds: 8);
 
+  /// 重试时使用更短的超时，避免用户长时间等待。
+  static const Duration _retryTimeout = Duration(seconds: 5);
+
   /// 自动检测冷却：7 天。
   static const Duration _cooldown =
       Duration(days: AppConstants.updateCheckCooldownDays);
@@ -77,6 +81,8 @@ class UpdateService {
   Uri get _manifestUri => Uri.parse(AppConstants.updateManifestUrl);
 
   Uri get _apiUri => Uri.parse(AppConstants.updateApiUrl);
+
+  Uri get _mirrorUri => Uri.parse(AppConstants.updateMirrorUrl);
 
   /// 冷启动自动检测是否已过冷却期。
   bool shouldAutoCheck() {
@@ -108,7 +114,8 @@ class UpdateService {
 
   /// 记录「稍后提醒」，避免下一次冷启动重复弹窗。
   Future<void> dismiss(AppVersionInfo info) {
-    return _storage.setInt(StorageKeys.updateSkippedVersionCode, _dismissKey(info));
+    return _storage.setInt(
+        StorageKeys.updateSkippedVersionCode, _dismissKey(info));
   }
 
   /// 检测更新：Gitee 优先，失败后切换 GitHub，两个都失败返回 [UpdateStatus.failed]。
@@ -117,8 +124,28 @@ class UpdateService {
   Future<UpdateCheckResult> check() async {
     final List<_UpdateSource> sources = <_UpdateSource>[
       _UpdateSource(
-        label: 'Gitee',
+        label: 'Gitee Pages',
         uri: _manifestUri,
+        parser: AppVersionInfo.fromManifest,
+      ),
+      // Pages 还没部署或缓存未刷新时，回落到仓库 raw 文件。
+      _UpdateSource(
+        label: 'Gitee',
+        uri: Uri.parse(AppConstants.updateRawManifestUrl),
+        parser: AppVersionInfo.fromManifest,
+      ),
+      // GitHub 仓库 raw：只要把 version.json 推到 main 分支就能读到，
+      // 不需要开 Pages、也不需要发 Release，是最稳的一路。
+      _UpdateSource(
+        label: 'GitHub raw',
+        uri: Uri.parse(AppConstants.updateGithubRawManifestUrl),
+        parser: AppVersionInfo.fromManifest,
+      ),
+      // jsDelivr 是国内可直连的 GitHub 静态镜像：即使 Gitee 仓库没有
+      // version.json，只要 GitHub 仓库里放了文件，这里也能读到。
+      _UpdateSource(
+        label: 'jsDelivr',
+        uri: _mirrorUri,
         parser: AppVersionInfo.fromManifest,
       ),
       _UpdateSource(
@@ -131,7 +158,7 @@ class UpdateService {
     String? lastError;
     for (final _UpdateSource source in sources) {
       try {
-        final String raw = await _fetch(source.uri);
+        final String raw = await _fetchWithRetry(source.uri);
         final Object? decoded = jsonDecode(raw);
         if (decoded is! Map<String, dynamic>) {
           throw const FormatException('返回内容不是 JSON 对象');
@@ -156,7 +183,8 @@ class UpdateService {
           sourceLabel: source.label,
         );
       } on Object catch (error) {
-        lastError = '$error';
+        lastError = '${source.label}: ${_describeError(error)}';
+        debugPrint('[NakanoWenku][update] $lastError');
       }
     }
 
@@ -166,15 +194,89 @@ class UpdateService {
     );
   }
 
+  /// 带一次重试的请求：超时、连接中断、5xx 都值得再试一次，
+  /// 404 这类「远端确实没有文件」只报错不重试。
+  Future<String> _fetchWithRetry(Uri uri) async {
+    try {
+      return await _fetch(uri);
+    } on Object catch (error) {
+      if (!_shouldRetry(error)) {
+        rethrow;
+      }
+      debugPrint('[NakanoWenku][update] retry ${uri.host}${uri.path}');
+      return _fetch(uri, timeout: _retryTimeout);
+    }
+  }
+
+  static bool _shouldRetry(Object error) {
+    if (error is TimeoutException) {
+      return true;
+    }
+    if (error is SocketException) {
+      return true;
+    }
+    if (error is HttpException) {
+      final String text = error.message;
+      final int? code = int.tryParse(
+        RegExp(r'\d{3}').firstMatch(text)?.group(0) ?? '',
+      );
+      return code == null || code >= 500;
+    }
+    return false;
+  }
+
+  /// 把异常翻译成可读日志，界面统一用友好文案。
+  static String _describeError(Object error) {
+    if (error is TimeoutException) {
+      return '请求超时';
+    }
+    if (error is SocketException) {
+      return '网络不可达';
+    }
+    if (error is HttpException) {
+      final int? code = int.tryParse(
+        RegExp(r'\d{3}').firstMatch(error.message)?.group(0) ?? '',
+      );
+      if (code == 404) {
+        return '远端缺少 version.json（404）';
+      }
+      return '服务返回异常（${code ?? error.message}）';
+    }
+    if (error is FormatException) {
+      return '返回内容格式不正确';
+    }
+    return '未知错误';
+  }
+
   /// 打开下载地址。
   ///
   /// 使用外部应用打开：Android 会交给浏览器 / 系统下载管理器，
   /// 下载完成后点击通知即可进入系统安装器，全程不申请安装权限。
   Future<bool> openDownload(AppVersionInfo info) async {
-    if (!info.hasDownload) {
-      return false;
+    // 清单里没有直链时（例如只填了版本号），按「Gitee Pages → GitHub raw →
+    // Gitee raw → Releases 页」的顺序逐个试，尽量让用户点到就能下。
+    final List<String> candidates = <String>[
+      if (info.hasDownload) info.downloadUrl,
+      if (!info.hasDownload) AppConstants.updateApkUrl,
+      ...AppConstants.updateApkFallbackUrls,
+      AppConstants.updateReleasesPage,
+    ];
+
+    for (final String target in candidates) {
+      if (target.isEmpty) {
+        continue;
+      }
+      final Uri uri =
+          Uri.tryParse(target) ?? Uri.parse(AppConstants.updateReleasesPage);
+      final bool opened = await _launch(uri);
+      if (opened) {
+        return true;
+      }
     }
-    final Uri uri = Uri.parse(info.downloadUrl);
+    return false;
+  }
+
+  Future<bool> _launch(Uri uri) async {
     final Future<bool> Function(Uri uri)? launcher = _launcher;
     if (launcher != null) {
       try {
@@ -199,16 +301,19 @@ class UpdateService {
         : info.versionName.hashCode.abs();
   }
 
-  Future<String> _fetch(Uri uri) async {
+  Future<String> _fetch(
+    Uri uri, {
+    Duration timeout = _requestTimeout,
+  }) async {
     final Future<String> Function(Uri uri)? fetcher = _fetcher;
     if (fetcher != null) {
-      return fetcher(uri).timeout(_requestTimeout);
+      return fetcher(uri).timeout(timeout);
     }
 
-    final HttpClient client = HttpClient()..connectionTimeout = _requestTimeout;
+    final HttpClient client = HttpClient()..connectionTimeout = timeout;
     try {
       final HttpClientRequest request =
-          await client.getUrl(uri).timeout(_requestTimeout);
+          await client.getUrl(uri).timeout(timeout);
       request.headers.set(
         HttpHeaders.acceptHeader,
         'application/json, text/plain, */*',
@@ -219,14 +324,11 @@ class UpdateService {
       );
 
       final HttpClientResponse response =
-          await request.close().timeout(_requestTimeout);
+          await request.close().timeout(timeout);
       if (response.statusCode != HttpStatus.ok) {
         throw HttpException('HTTP ${response.statusCode}', uri: uri);
       }
-      return await response
-          .transform(utf8.decoder)
-          .join()
-          .timeout(_requestTimeout);
+      return await response.transform(utf8.decoder).join().timeout(timeout);
     } finally {
       client.close(force: true);
     }

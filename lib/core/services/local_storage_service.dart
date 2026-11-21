@@ -21,8 +21,7 @@ class LocalStorageService {
   bool getBool(String key, {bool fallback = false}) =>
       _prefs.getBool(key) ?? fallback;
 
-  int getInt(String key, {int fallback = 0}) =>
-      _prefs.getInt(key) ?? fallback;
+  int getInt(String key, {int fallback = 0}) => _prefs.getInt(key) ?? fallback;
 
   double getDouble(String key, {double fallback = 0}) =>
       _prefs.getDouble(key) ?? fallback;

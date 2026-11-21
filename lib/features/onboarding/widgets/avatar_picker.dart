@@ -48,7 +48,8 @@ Future<String?> pickAvatarImagePath() async {
         ? '.png'
         : p.extension(file.name).toLowerCase();
     final File temp = File(
-      p.join(dir.path, 'picked_avatar_${DateTime.now().millisecondsSinceEpoch}$ext'),
+      p.join(dir.path,
+          'picked_avatar_${DateTime.now().millisecondsSinceEpoch}$ext'),
     );
     await temp.writeAsBytes(bytes, flush: true);
     return temp.path;

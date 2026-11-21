@@ -114,11 +114,11 @@ class AboutAuthorPage extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(24, 18, 24, 44),
                   children: <Widget>[
                     _buildAuthorCard(context, brightness),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 30),
                     _buildLinksCard(context, brightness),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 30),
                     _buildGroupCard(context, brightness),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 30),
                     _buildDonateCard(context, brightness),
                   ],
                 ),
@@ -208,7 +208,7 @@ class AboutAuthorPage extends StatelessWidget {
                     vertical: 14,
                   ),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(16),
                     color: AppColors.alpha(accent, 0.05),
                     border: Border.all(
                       color: AppColors.alpha(accent, 0.4),
@@ -273,6 +273,7 @@ class AboutAuthorPage extends StatelessWidget {
                 english: 'GITHUB PROFILE',
                 value: AppConstants.author,
                 brightness: brightness,
+                copyValue: AppConstants.authorUrl,
                 onTap: () => _openUrl(
                   context,
                   AppConstants.authorUrl,
@@ -286,6 +287,7 @@ class AboutAuthorPage extends StatelessWidget {
                 english: 'SOURCE CODE',
                 value: 'nakano-wenku-flutter',
                 brightness: brightness,
+                copyValue: AppConstants.repoUrl,
                 onTap: () => _openUrl(
                   context,
                   AppConstants.repoUrl,
@@ -377,7 +379,7 @@ class AboutAuthorPage extends StatelessWidget {
                   height: 42,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(13),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: AppColors.alpha(accent, 0.4),
                       width: 0.9,
@@ -433,7 +435,7 @@ class AboutAuthorPage extends StatelessWidget {
                   height: 44,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: AppColors.alpha(
                         AppColors.accent(brightness),
@@ -531,7 +533,7 @@ class _DonateDialogBodyState extends State<_DonateDialogBody> {
     return Column(
       children: <Widget>[
         ClipRRect(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           child: Image.asset(
             AppConstants.donateQrAsset,
             width: 216,
@@ -573,7 +575,7 @@ class _DonateDialogBodyState extends State<_DonateDialogBody> {
             height: 42,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(13),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: AppColors.alpha(accent, 0.4),
                 width: 0.9,
@@ -622,6 +624,9 @@ class _ScrollableText extends StatelessWidget {
 }
 
 /// 图标 + 中英文标签 + 右侧值的链接行。
+///
+/// 点击直接唤起浏览器；长按把链接复制进剪贴板（只给一次轻震动反馈，
+/// 不弹任何提示窗）。
 class _LinkRow extends StatelessWidget {
   const _LinkRow({
     required this.icon,
@@ -629,6 +634,7 @@ class _LinkRow extends StatelessWidget {
     required this.english,
     required this.value,
     required this.brightness,
+    required this.copyValue,
     required this.onTap,
   });
 
@@ -637,62 +643,72 @@ class _LinkRow extends StatelessWidget {
   final String english;
   final String value;
   final Brightness brightness;
+  final String copyValue;
   final VoidCallback onTap;
+
+  Future<void> _copyValue() async {
+    await Clipboard.setData(ClipboardData(text: copyValue));
+    await HapticFeedback.mediumImpact();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return PressableScale(
-      pressedScale: 0.99,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Row(
-          children: <Widget>[
-            Icon(icon, size: 18, color: AppColors.textSecondary(brightness)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      color: AppColors.textPrimary(brightness),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPress: _copyValue,
+      child: PressableScale(
+        pressedScale: 0.99,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Row(
+            children: <Widget>[
+              Icon(icon, size: 18, color: AppColors.textSecondary(brightness)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        color: AppColors.textPrimary(brightness),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    english,
-                    style: AppTypography.englishLabel(
-                      brightness,
-                      fontSize: 8,
-                      letterSpacing: 1.8,
-                      color: AppColors.textTertiary(brightness),
+                    const SizedBox(height: 3),
+                    Text(
+                      english,
+                      style: AppTypography.englishLabel(
+                        brightness,
+                        fontSize: 8,
+                        letterSpacing: 1.8,
+                        color: AppColors.textTertiary(brightness),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 140),
-              child: Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  color: AppColors.accent(brightness),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 18,
-              color: AppColors.textTertiary(brightness),
-            ),
-          ],
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 140),
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: AppColors.accent(brightness),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: AppColors.textTertiary(brightness),
+              ),
+            ],
+          ),
         ),
       ),
     );

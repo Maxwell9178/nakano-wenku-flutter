@@ -12,8 +12,31 @@ if (localPropertiesFile.exists()) {
     }
 }
 
-def flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "1"
-def flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0.0"
+// 版本号统一由工程根目录的 version.json 决定：
+// 发版时只改 version.json 与 pubspec.yaml 的 version，二者保持一致即可。
+def versionFile = rootProject.file("../version.json")
+def releaseVersionName = "1.0.0"
+def releaseVersionCode = 1
+if (versionFile.exists()) {
+    def slurper = new groovy.json.JsonSlurper()
+    def versionJson = slurper.parse(versionFile)
+    releaseVersionName = (versionJson.versionName ?: releaseVersionName).toString()
+    releaseVersionCode = (versionJson.versionCode ?: releaseVersionCode) as int
+} else {
+    releaseVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0.0"
+    releaseVersionCode = (localProperties.getProperty("flutter.versionCode") ?: "1") as int
+}
+
+// 若工程根目录存在 key.properties，就用正式签名；否则沿用 debug 签名，
+// 保证 `flutter build apk` 在没有 keystore 的机器上也能出包。
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+def hasReleaseKey = keystorePropertiesFile.exists()
+if (hasReleaseKey) {
+    keystorePropertiesFile.withReader("UTF-8") { reader ->
+        keystoreProperties.load(reader)
+    }
+}
 
 android {
     namespace = "com.maxwell.nakanowenku"
@@ -21,12 +44,13 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled = false
     }
 
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
 
     defaultConfig {
@@ -34,15 +58,47 @@ android {
         // file_picker / path_provider 等插件的最低要求。
         minSdkVersion = flutter.minSdkVersion
         targetSdk = 36
-        versionCode = flutterVersionCode.toInteger()
-        versionName = flutterVersionName
+        versionCode = releaseVersionCode
+        versionName = releaseVersionName
+        // 只保留中文与英文资源，减少包体。
+        resConfigs "zh", "en"
+    }
+
+    signingConfigs {
+        if (hasReleaseKey) {
+            release {
+                keyAlias = keystoreProperties["keyAlias"]
+                keyPassword = keystoreProperties["keyPassword"]
+                storeFile = keystoreProperties["storeFile"] ? file(keystoreProperties["storeFile"]) : null
+                storePassword = keystoreProperties["storePassword"]
+                // 三种签名方案全开：v1（JAR，Android 7.0 及以下的安装校验）、
+                // v2（APK Signature Scheme v2，7.0+ 的整包校验）、
+                // v3（9.0+ 的密钥轮换与更严格校验）。
+                // 全开才能在老机与新机上都能正常安装、也方便后续换签名密钥。
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
     }
 
     buildTypes {
         release {
-            // 开源项目不内置签名文件，发布版沿用 debug 签名以便直接
-            // flutter build apk 出包；正式上架时请替换为自己的 keystore。
-            signingConfig = signingConfigs.debug
+            signingConfig = hasReleaseKey ? signingConfigs.release : signingConfigs.debug
+            // Flutter 自带 proguard 规则，这里只补本工程自己的保留项。
+            minifyEnabled = true
+            shrinkResources = true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+        debug {
+            // 调试包不压缩，方便看堆栈。
+            minifyEnabled = false
+        }
+    }
+
+    packagingOptions {
+        resources {
+            excludes += ["META-INF/*.kotlin_module", "META-INF/LICENSE*", "META-INF/NOTICE*"]
         }
     }
 }
@@ -50,4 +106,3 @@ android {
 flutter {
     source = "../.."
 }
-

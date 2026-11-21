@@ -23,6 +23,9 @@ class LibrarySearchController extends ChangeNotifier {
   /// 全部藏书数量，用于空态提示。
   int get totalBooks => _all.length;
 
+  /// 全部藏书（只读）。搜索页的榜单外壳用它占位，不做任何排序业务。
+  List<Book> get allBooks => _all;
+
   /// 进入页面时读一次本地书籍；切换标签回来可再次调用。
   void loadBooks() {
     _all = _books.loadAll();
@@ -91,6 +94,11 @@ class LibrarySearchController extends ChangeNotifier {
     }
     if (book.id.toLowerCase().contains(keyword)) {
       return 4;
+    }
+    // 导入分组也能当关键词筛选。
+    final String? group = book.group;
+    if (group != null && group.toLowerCase().contains(keyword)) {
+      return 5;
     }
     return -1;
   }

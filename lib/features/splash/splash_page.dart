@@ -91,9 +91,8 @@ class _SplashPageState extends State<SplashPage>
     }
 
     final UserProfileController profile = context.read<UserProfileController>();
-    final String target = profile.onboardingCompleted
-        ? AppRoutes.home
-        : AppRoutes.onboarding;
+    final String target =
+        profile.onboardingCompleted ? AppRoutes.home : AppRoutes.onboarding;
 
     Navigator.of(context).pushReplacementNamed(target);
   }
@@ -136,27 +135,40 @@ class _SplashPageState extends State<SplashPage>
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
-                          Text(
-                            AppConstants.appName,
-                            textAlign: TextAlign.center,
-                            style: AppTypography.textTheme(brightness)
-                                .displayLarge
-                                ?.copyWith(
-                                  fontSize: 38,
-                                  letterSpacing: 7.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                          // 软件名单行展示：窄屏自动等比缩小，绝不折行。
+                          SizedBox(
+                            width: double.infinity,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                AppConstants.appName,
+                                maxLines: 1,
+                                softWrap: false,
+                                textAlign: TextAlign.center,
+                                style: AppTypography.textTheme(brightness)
+                                    .displayLarge
+                                    ?.copyWith(
+                                      fontSize: 38,
+                                      letterSpacing: 6.0,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 18),
-                          // 大字与小字之间的分割线。
+                          // 大字与小字之间的分割线（可见的浅灰）。
                           AnimatedBuilder(
                             animation: _lineGrow,
                             builder: (BuildContext context, Widget? child) {
                               return SizedBox(
                                 width: 132 * _lineGrow.value,
-                                child: const ThinDivider(
+                                child: ThinDivider(
                                   thickness: 0.9,
                                   width: double.infinity,
+                                  color: AppColors.alpha(
+                                    isDark ? Colors.white : Colors.black,
+                                    isDark ? 0.34 : 0.26,
+                                  ),
                                 ),
                               );
                             },

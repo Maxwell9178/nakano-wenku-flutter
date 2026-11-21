@@ -54,12 +54,14 @@ void main() {
       expect(payload.of(SyncEntityKind.excerpt).length, 1);
       expect(payload.of(SyncEntityKind.readingStats).length, 1);
       expect(payload.of(SyncEntityKind.settings).length, 1);
-      expect(payload.of(SyncEntityKind.book).first.documentId, 'user-1_NW-0001');
+      expect(
+          payload.of(SyncEntityKind.book).first.documentId, 'user-1_NW-0001');
       expect(payload.of(SyncEntityKind.progress).first.data['percent'], 42);
     });
 
     test('标签去重并去掉空白项', () {
-      expect(SyncSnapshotBuilder.collectTags(<Book>[book]), <String>['文学', '悬疑']);
+      expect(
+          SyncSnapshotBuilder.collectTags(<Book>[book]), <String>['文学', '悬疑']);
     });
 
     test('payload 可以 JSON 往返', () {

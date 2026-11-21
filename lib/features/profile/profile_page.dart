@@ -6,6 +6,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/services/account_data_service.dart';
 import '../../core/services/book_repository.dart';
 import '../../core/services/reading_stats_repository.dart';
+import '../../core/services/tag_weight_repository.dart';
 import '../../core/services/user_profile_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -54,6 +55,7 @@ class _ProfilePageState extends State<ProfilePage> {
       books: context.read<BookRepository>(),
       stats: context.read<ReadingStatsRepository>(),
       profile: context.read<UserProfileController>(),
+      tagWeights: context.read<TagWeightRepository>(),
     )..load();
 
     _controller = controller;
@@ -205,37 +207,37 @@ class _ProfilePageState extends State<ProfilePage> {
                 padding: const EdgeInsets.fromLTRB(0, 6, 0, 130),
                 children: <Widget>[
                   _buildHeader(brightness),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         _buildAccountCard(brightness, controller),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 18),
                         _buildStatRow(brightness, controller),
-                        const SizedBox(height: 26),
+                        const SizedBox(height: 30),
                         const SectionHeader(
                           title: '阅读数据',
                           english: 'READING DATA',
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                         _buildReadingEntries(brightness, controller),
-                        const SizedBox(height: 26),
+                        const SizedBox(height: 30),
                         const SectionHeader(
                           title: '阅读偏好',
                           english: 'READING TASTE',
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                         _buildRadarCard(brightness, controller),
-                        const SizedBox(height: 26),
+                        const SizedBox(height: 30),
                         const SectionHeader(
                           title: '数据与备份',
                           english: 'DATA & BACKUP',
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                         _buildBackupRow(brightness),
-                        const SizedBox(height: 30),
+                        const SizedBox(height: 34),
                         _buildDeleteAccount(brightness),
                       ],
                     ),
@@ -521,26 +523,34 @@ class _ProfilePageState extends State<ProfilePage> {
     Brightness brightness,
     ProfileController controller,
   ) {
-    final Map<String, double> ratios = controller.tagRatios;
-    final bool hasBooks = controller.totalBooks > 0;
+    // 八维：标签权重 × 阅读时长，阅读页退出后即时刷新。
+    final List<double> values = controller.tagRadar;
+    final List<String> dims = TagWeightRepository.dimensions;
+    final Map<String, double> ratios = <String, double>{
+      for (int i = 0; i < dims.length; i++)
+        dims[i]: i < values.length ? values[i] : 0,
+    };
+    final String? top = controller.topTag;
 
-    return LiquidGlass(
-      borderRadius: 22,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-      child: Column(
-        children: <Widget>[
-          TagRadarChart(ratios: ratios, size: 240),
-          const SizedBox(height: 6),
-          Text(
-            hasBooks ? '按内置六类标签统计 · 每天更新一次' : '导入书籍并打上标签后，这里会长出你的阅读形状',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 9.5,
-              letterSpacing: 0.5,
-              color: AppColors.textTertiary(brightness),
+    return SizedBox(
+      width: double.infinity,
+      child: LiquidGlass(
+        borderRadius: 22,
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+        child: Column(
+          children: <Widget>[
+            Center(child: TagRadarChart(ratios: ratios, size: 236)),
+            const SizedBox(height: 6),
+            Text(
+              top == null ? '开始阅读后这里会记录你的兴趣分布' : '最常读：$top',
+              style: TextStyle(
+                fontSize: 9.5,
+                letterSpacing: 0.8,
+                color: AppColors.textTertiary(brightness),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

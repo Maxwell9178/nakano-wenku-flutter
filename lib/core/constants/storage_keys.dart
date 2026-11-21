@@ -46,6 +46,9 @@ class StorageKeys {
   /// 阅读水印类型：poem / english。
   static const String watermarkType = 'nw.settings.watermarkType';
 
+  /// 装饰配色（第 3 轮）。
+  static const String decorationTone = 'nw.settings.decorationTone';
+
   /// 帧率偏好档位：auto / system / hz30 ... hz120。
   static const String frameRate = 'nw.settings.frameRate';
 
@@ -74,6 +77,11 @@ class StorageKeys {
   /// 摘抄库（JSON 数组）。
   static const String excerpts = 'nw.reading.excerpts';
 
+  /// 书签库（JSON 数组，按书 + 章节位置存储，与阅读进度互不影响）。
+  static const String bookmarks = 'nw.reading.bookmarks';
+
+  /// 批注库（JSON 数组，原文片段 + 用户批注）。
+
   // ---------------- 阅读统计（我的页 / 打卡） ----------------
 
   /// 每日阅读秒数（JSON 对象：`yyyy-MM-dd` → 秒数）。
@@ -81,6 +89,9 @@ class StorageKeys {
 
   /// 累计阅读秒数（跨天累加，不与每日记录重复计算）。
   static const String readingTotalSeconds = 'nw.stats.readingTotalSeconds';
+
+  /// 阅读标签权重（JSON 对象：标签 → 分值），雷达图数据源。
+  static const String tagScores = 'nw.stats.tagScores';
 
   // ---------------- 版本更新 ----------------
 

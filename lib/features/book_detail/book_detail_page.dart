@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/models/book.dart';
+import '../../core/models/bookmark.dart';
 import '../../core/models/chapter.dart';
 import '../../core/routing/app_routes.dart';
 import '../../core/services/book_repository.dart';
+import '../../core/services/bookmark_repository.dart';
 import '../../core/services/chapter_repository.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -23,6 +25,7 @@ import '../../core/widgets/thin_divider.dart';
 import '../bookshelf/widgets/book_cover_art.dart';
 import '../reader/reader_arguments.dart';
 import 'book_detail_controller.dart';
+import 'widgets/book_share_card.dart';
 
 /// 书籍详情页：封面 / 元信息 / 章节目录 / 标签管理 / 元数据编辑。
 ///
@@ -44,6 +47,9 @@ class _BookDetailPageState extends State<BookDetailPage> {
   bool _selecting = false;
   final Set<int> _selected = <int>{};
 
+  /// 本书书签 / 批注条数，用于详情页入口角标。
+  int _bookmarkCount = 0;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -52,6 +58,23 @@ class _BookDetailPageState extends State<BookDetailPage> {
       chapters: context.read<ChapterRepository>(),
       book: widget.book,
     )..load();
+    _loadExtras();
+  }
+
+  Future<void> _loadExtras() async {
+    try {
+      final List<Bookmark> bookmarks = await context
+          .read<BookmarkRepository>()
+          .loadForBook(widget.book.number);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _bookmarkCount = bookmarks.length;
+      });
+    } catch (_) {
+      // 读不到就保持 0，不影响详情页其它内容。
+    }
   }
 
   @override
@@ -97,28 +120,17 @@ class _BookDetailPageState extends State<BookDetailPage> {
                       padding: const EdgeInsets.fromLTRB(0, 18, 0, 40),
                       children: <Widget>[
                         _buildHeader(context),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 28),
                         _buildMetadataSection(context),
-                        const SizedBox(height: 22),
+                        const SizedBox(height: 26),
                         _buildTagsSection(context),
-                        const SizedBox(height: 22),
+                        const SizedBox(height: 26),
                         _buildReadingSection(context),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 26),
+                        _buildStatsSection(context),
+                        const SizedBox(height: 28),
                         _buildContents(context),
-                        const SizedBox(height: 18),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Text(
-                            '第 3 轮 · 章节目录与元数据已可用；正文阅读、摘抄与读完标记将在后续轮次实现。',
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              height: 1.6,
-                              color: AppColors.textTertiary(
-                                Theme.of(context).brightness,
-                              ),
-                            ),
-                          ),
-                        ),
+                        const SizedBox(height: 22),
                       ],
                     ),
                   ),
@@ -180,11 +192,12 @@ class _BookDetailPageState extends State<BookDetailPage> {
               children: <Widget>[
                 Text(
                   book.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  // 长书名换行展示，禁用省略号截断。
+                  softWrap: true,
                   style: AppTypography.chineseTitle(brightness).copyWith(
                     fontSize: 21,
                     letterSpacing: 0.4,
+                    height: 1.3,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -242,7 +255,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: AppColors.alpha(AppColors.divider(brightness), 0.9),
                 width: 0.8,
@@ -430,6 +443,63 @@ class _BookDetailPageState extends State<BookDetailPage> {
     );
   }
 
+  // ---------------------------------------------------------------- 本书数据
+
+  Widget _buildStatsSection(BuildContext context) {
+    final Brightness brightness = Theme.of(context).brightness;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: SectionHeader(
+            title: '本书数据',
+            english: 'Statistics',
+            trailing: _LinkText(label: '分享图', onTap: _showShareCard),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: LiquidGlass(
+            borderRadius: 16,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: <Widget>[
+                _StatRow(
+                  icon: Icons.schedule_rounded,
+                  label: '累计阅读',
+                  english: 'READ TIME',
+                  value: _c.book.totalReadLabel,
+                  brightness: brightness,
+                ),
+                _RowDivider(brightness: brightness),
+                _StatRow(
+                  icon: Icons.bookmark_border_rounded,
+                  label: '书签',
+                  english: 'BOOKMARKS',
+                  value: '$_bookmarkCount 条',
+                  brightness: brightness,
+                  onTap: () => _openList(AppRoutes.bookmarks),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openList(String route) async {
+    await Navigator.of(context).pushNamed(route, arguments: _c.book);
+    _loadExtras();
+  }
+
+  Future<void> _showShareCard() async {
+    await showBookShareDialog(context, book: _c.book);
+  }
+
   // ---------------------------------------------------------------- 目录
 
   Widget _buildContents(BuildContext context) {
@@ -574,8 +644,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
       english: 'Book title',
       initialValue: _c.book.title,
       maxLength: 60,
-      validator: (String input) =>
-          input.trim().isEmpty ? '书名不能为空' : null,
+      validator: (String input) => input.trim().isEmpty ? '书名不能为空' : null,
     );
     if (value == null || !mounted) {
       return;
@@ -590,8 +659,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
       english: 'Author',
       initialValue: _c.book.author,
       maxLength: 40,
-      validator: (String input) =>
-          input.trim().isEmpty ? '作者不能为空' : null,
+      validator: (String input) => input.trim().isEmpty ? '作者不能为空' : null,
     );
     if (value == null || !mounted) {
       return;
@@ -613,7 +681,8 @@ class _BookDetailPageState extends State<BookDetailPage> {
         if (number == null) {
           return '请输入 1 ~ 9999 的数字';
         }
-        if (number < AppConstants.bookIdMin || number > AppConstants.bookIdMax) {
+        if (number < AppConstants.bookIdMin ||
+            number > AppConstants.bookIdMax) {
           return '编号范围 0001 ~ 9999';
         }
         if (_c.isNumberTaken(number)) {
@@ -753,6 +822,14 @@ class _BookDetailPageState extends State<BookDetailPage> {
     }
     final Book updated = await _c.markReadingPosition(chapterIndex);
     if (!mounted) {
+      return;
+    }
+    // 漫画包走独立的漫画阅读页，不进入文字阅读器。
+    if (updated.isComic) {
+      await Navigator.of(context).pushNamed(
+        AppRoutes.comic,
+        arguments: updated,
+      );
       return;
     }
     await Navigator.of(context).pushNamed(
@@ -1067,7 +1144,6 @@ class _ChapterRow extends StatelessWidget {
 
 class _LinkText extends StatelessWidget {
   const _LinkText({required this.label, required this.onTap});
-
   final String label;
   final VoidCallback onTap;
 
@@ -1083,6 +1159,90 @@ class _LinkText extends StatelessWidget {
           color: AppColors.accent(Theme.of(context).brightness),
         ),
       ),
+    );
+  }
+}
+
+/// 详情页「本书数据」单行：图标 + 中文标签 + 英文小字 + 右侧数值。
+class _StatRow extends StatelessWidget {
+  const _StatRow({
+    required this.icon,
+    required this.label,
+    required this.english,
+    required this.value,
+    required this.brightness,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String english;
+  final String value;
+  final Brightness brightness;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: <Widget>[
+          Icon(
+            icon,
+            size: 15,
+            color: AppColors.alpha(AppColors.textSecondary(brightness), 0.9),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textPrimary(brightness),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  english,
+                  style: AppTypography.englishLabel(
+                    brightness,
+                    fontSize: 7.4,
+                    letterSpacing: 1.8,
+                  ).copyWith(color: AppColors.textTertiary(brightness)),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontFamily: AppFonts.serif,
+              fontSize: 11.5,
+              color: AppColors.textSecondary(brightness),
+            ),
+          ),
+          if (onTap != null) ...<Widget>[
+            const SizedBox(width: 4),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 15,
+              color: AppColors.textTertiary(brightness),
+            ),
+          ],
+        ],
+      ),
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+    return PressableScale(
+      pressedScale: 0.98,
+      onTap: onTap,
+      child: content,
     );
   }
 }

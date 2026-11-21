@@ -34,8 +34,7 @@ Future<UpdateDialogAction> showUpdateDialog(
           GlassDialogButton(
             label: '立即下载',
             primary: true,
-            onTap: () =>
-                Navigator.of(context).pop(UpdateDialogAction.download),
+            onTap: () => Navigator.of(context).pop(UpdateDialogAction.download),
           ),
           GlassDialogButton(
             label: '稍后提醒',
@@ -89,7 +88,7 @@ class _UpdateDialogBody extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: AppColors.alpha(AppColors.accent(brightness), 0.5),
                     width: 0.8,

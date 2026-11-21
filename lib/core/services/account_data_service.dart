@@ -4,11 +4,13 @@ import '../constants/storage_keys.dart';
 import '../models/book.dart';
 import '../settings/app_settings.dart';
 import 'book_repository.dart';
+import 'bookmark_repository.dart';
 import 'chapter_repository.dart';
 import 'excerpt_repository.dart';
 import 'local_storage_service.dart';
 import 'reading_preferences_repository.dart';
 import 'reading_stats_repository.dart';
+import 'tag_weight_repository.dart';
 import 'user_profile_controller.dart';
 
 /// 删除账号：把这部份「只属于当前账号」的本地数据全部清干净。
@@ -32,6 +34,8 @@ class AccountDataService {
     required ReadingStatsRepository stats,
     required ExcerptRepository excerpts,
     required ReadingPreferencesRepository readingPreferences,
+    required BookmarkRepository bookmarks,
+    required TagWeightRepository tagWeights,
   })  : _storage = storage,
         _books = books,
         _chapters = chapters,
@@ -39,7 +43,9 @@ class AccountDataService {
         _settings = settings,
         _stats = stats,
         _excerpts = excerpts,
-        _readingPreferences = readingPreferences;
+        _readingPreferences = readingPreferences,
+        _bookmarks = bookmarks,
+        _tagWeights = tagWeights;
 
   final LocalStorageService _storage;
   final BookRepository _books;
@@ -49,6 +55,8 @@ class AccountDataService {
   final ReadingStatsRepository _stats;
   final ExcerptRepository _excerpts;
   final ReadingPreferencesRepository _readingPreferences;
+  final BookmarkRepository _bookmarks;
+  final TagWeightRepository _tagWeights;
 
   /// 执行删除，返回是否全部顺利。
   Future<bool> deleteAccount() async {
@@ -71,6 +79,8 @@ class AccountDataService {
 
     try {
       await _excerpts.clear();
+      await _bookmarks.clear();
+      await _tagWeights.clear();
       await _readingPreferences.clearAll();
       await _stats.reset();
     } catch (_) {

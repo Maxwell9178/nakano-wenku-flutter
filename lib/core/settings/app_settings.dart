@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/storage_keys.dart';
+import '../theme/app_colors.dart';
 import '../services/local_storage_service.dart';
 
 /// 边框粗细档位（设置页第 4 项）。
@@ -44,19 +45,28 @@ GlassBorderLevel glassBorderLevelFromStorage(String? value) {
 
 /// 阅读字体来源（设置页第 5 项）。
 ///
-/// system：跟随系统字体；serif：内置宋体回退链；kai：楷体回退链；
-/// custom：用户导入的第三方字体包（运行时通过 FontLoader 注册）。
-enum ReadingFontMode { system, serif, kai, custom }
+/// 字体只作用于「阅读正文 / 书名等小字」；所有中文大标题固定宋体，
+/// 不受这里的选项影响（见 AppTypography 里的强制衬线逻辑）。
+/// custom 为用户导入的第三方字体包（运行时通过 FontLoader 注册）。
+enum ReadingFontMode { system, hei, serif, kai, mono, light, medium, custom }
 
 extension ReadingFontModeX on ReadingFontMode {
   String get label {
     switch (this) {
       case ReadingFontMode.system:
         return '系统字体';
+      case ReadingFontMode.hei:
+        return '黑体';
       case ReadingFontMode.serif:
         return '宋体';
       case ReadingFontMode.kai:
         return '楷体';
+      case ReadingFontMode.mono:
+        return '等宽';
+      case ReadingFontMode.light:
+        return '细黑';
+      case ReadingFontMode.medium:
+        return '中黑';
       case ReadingFontMode.custom:
         return '自定义';
     }
@@ -66,12 +76,42 @@ extension ReadingFontModeX on ReadingFontMode {
     switch (this) {
       case ReadingFontMode.system:
         return 'SYSTEM';
+      case ReadingFontMode.hei:
+        return 'SANS';
       case ReadingFontMode.serif:
         return 'SERIF';
       case ReadingFontMode.kai:
         return 'KAI';
+      case ReadingFontMode.mono:
+        return 'MONO';
+      case ReadingFontMode.light:
+        return 'LIGHT';
+      case ReadingFontMode.medium:
+        return 'MEDIUM';
       case ReadingFontMode.custom:
         return 'CUSTOM';
+    }
+  }
+
+  /// 供 TextStyle.fontFamily 使用的字体族；null 表示跟随系统。
+  String? get family {
+    switch (this) {
+      case ReadingFontMode.system:
+        return null;
+      case ReadingFontMode.hei:
+        return 'sans-serif';
+      case ReadingFontMode.serif:
+        return 'serif';
+      case ReadingFontMode.kai:
+        return 'cursive';
+      case ReadingFontMode.mono:
+        return 'monospace';
+      case ReadingFontMode.light:
+        return 'sans-serif-light';
+      case ReadingFontMode.medium:
+        return 'sans-serif-medium';
+      case ReadingFontMode.custom:
+        return 'NWCustomFont';
     }
   }
 }
@@ -132,83 +172,66 @@ WatermarkType watermarkTypeFromStorage(String? value) {
 /// 帧率偏好（设置页第 10 项）。
 ///
 /// 说明：Flutter 无法在纯 Dart 层强制改写屏幕刷新率，
-/// 这里保存的是偏好档位；实际刷新率仍由系统调度决定，
-/// 需要更高精度时由后续原生模块读取该偏好。
-enum FrameRateOption { auto, system, hz30, hz48, hz50, hz60, hz90, hz120 }
+/// 这里保存的是偏好档位；实际刷新率仍由系统调度决定。
+/// 第一轮收敛为三档：30 Hz / 60 Hz / 系统自调，
+/// 高刷档位在不支持设备上无效，已移除。
+enum FrameRateOption { system, hz30, hz60 }
 
 extension FrameRateOptionX on FrameRateOption {
   String get label {
     switch (this) {
-      case FrameRateOption.auto:
-        return '自动高刷';
       case FrameRateOption.system:
-        return '系统调度';
+        return '系统自调';
       case FrameRateOption.hz30:
         return '30 Hz';
-      case FrameRateOption.hz48:
-        return '48 Hz';
-      case FrameRateOption.hz50:
-        return '50 Hz';
       case FrameRateOption.hz60:
         return '60 Hz';
-      case FrameRateOption.hz90:
-        return '90 Hz';
-      case FrameRateOption.hz120:
-        return '120 Hz';
     }
   }
 
-  /// 目标帧率；0 表示交给系统 / 自动。
+  /// 目标帧率；0 表示交给系统。
   int get fps {
     switch (this) {
-      case FrameRateOption.auto:
       case FrameRateOption.system:
         return 0;
       case FrameRateOption.hz30:
         return 30;
-      case FrameRateOption.hz48:
-        return 48;
-      case FrameRateOption.hz50:
-        return 50;
       case FrameRateOption.hz60:
         return 60;
-      case FrameRateOption.hz90:
-        return 90;
-      case FrameRateOption.hz120:
-        return 120;
     }
   }
 
   String get description {
     switch (this) {
-      case FrameRateOption.auto:
-        return '跟随屏幕自身的高刷新率，兼顾流畅与省电';
       case FrameRateOption.system:
-        return '完全交给系统调度，软件不做任何干预';
-      case FrameRateOption.hz120:
-        return '最流畅，适合高刷屏，耗电相对更高';
-      case FrameRateOption.hz90:
-        return '高刷屏的折中选择，兼顾流畅与发热';
-      case FrameRateOption.hz60:
-        return '主流流畅度，功耗表现均衡';
-      case FrameRateOption.hz50:
-        return '略低于 60，适合长时间阅读';
-      case FrameRateOption.hz48:
-        return '更省电，翻页仍然顺滑';
+        return '跟随屏幕自身刷新率，兼顾流畅与省电';
       case FrameRateOption.hz30:
         return '最省电，适合只做静态阅读时使用';
+      case FrameRateOption.hz60:
+        return '主流流畅度，功耗表现均衡';
     }
   }
 }
 
-/// 从存储值还原帧率档位。
+/// 从存储值还原帧率档位（兼容旧版本的多档位存储值）。
 FrameRateOption frameRateOptionFromStorage(String? value) {
   for (final FrameRateOption option in FrameRateOption.values) {
     if (option.name == value) {
       return option;
     }
   }
-  return FrameRateOption.auto;
+  switch (value) {
+    case 'hz30':
+    case 'hz48':
+    case 'hz50':
+      return FrameRateOption.hz30;
+    case 'hz60':
+    case 'hz90':
+    case 'hz120':
+      return FrameRateOption.hz60;
+    default:
+      return FrameRateOption.system;
+  }
 }
 
 /// 玻璃材质的计算结果。
@@ -258,16 +281,47 @@ class AppSettingsController extends ChangeNotifier {
   static const int _defaultGlassOpacity = 42;
   static const GlassBorderLevel _defaultBorder = GlassBorderLevel.thin;
   static const ReadingFontMode _defaultFontMode = ReadingFontMode.system;
+  static const DecorationTone _defaultDecorationTone = DecorationTone.none;
   static const bool _defaultWatermarkEnabled = false;
   static const WatermarkType _defaultWatermarkType = WatermarkType.poem;
-  static const FrameRateOption _defaultFrameRate = FrameRateOption.auto;
+  static const FrameRateOption _defaultFrameRate = FrameRateOption.system;
   static const bool _defaultReduceMotion = false;
+
+  /// 全局「减少动画」开关的静态快照。
+  ///
+  /// 目的：让 PressableScale / LiquidGlass / GlassSlider 这类高频组件
+  /// 不必依赖一次 Provider 查找，就能把动画时长压到 0。
+  static bool disableMotion = _defaultReduceMotion;
+
+  /// 全局帧率偏好的静态快照（0 表示跟随系统）。
+  static int activeFps = 0;
+
+  /// 统一的动效时长换算。
+  ///
+  /// - 「减少动画」开启时返回 [Duration.zero]，让过渡直接跳到终态；
+  /// - 帧率选 30Hz 时把过渡放慢一倍，使低帧率下的位移更连续、可感知；
+  /// - 其余情况返回原始时长。
+  static Duration motion(int milliseconds) {
+    if (disableMotion) {
+      return Duration.zero;
+    }
+    if (activeFps <= 0) {
+      return Duration(milliseconds: milliseconds);
+    }
+    final int fps = activeFps.clamp(24, 60);
+    if (fps >= 60) {
+      return Duration(milliseconds: milliseconds);
+    }
+    final double factor = 60 / fps;
+    return Duration(milliseconds: (milliseconds * factor).round());
+  }
 
   ThemeMode _themeMode = _defaultThemeMode;
   int _glassBlur = _defaultGlassBlur;
   int _glassOpacity = _defaultGlassOpacity;
   GlassBorderLevel _glassBorder = _defaultBorder;
   ReadingFontMode _readingFontMode = _defaultFontMode;
+  DecorationTone _decorationTone = _defaultDecorationTone;
   String? _customFontPath;
   bool _watermarkEnabled = _defaultWatermarkEnabled;
   WatermarkType _watermarkType = _defaultWatermarkType;
@@ -289,6 +343,9 @@ class AppSettingsController extends ChangeNotifier {
   /// 阅读字体来源。
   ReadingFontMode get readingFontMode => _readingFontMode;
 
+  /// 当前装饰配色。
+  DecorationTone get decorationTone => _decorationTone;
+
   /// 已导入的第三方字体文件路径（未导入时为 null）。
   String? get customFontPath => _customFontPath;
 
@@ -306,16 +363,10 @@ class AppSettingsController extends ChangeNotifier {
 
   /// 当前是否需要覆盖全局字体（系统字体时返回 null）。
   String? get fontFamilyOverride {
-    switch (_readingFontMode) {
-      case ReadingFontMode.system:
-        return null;
-      case ReadingFontMode.serif:
-        return 'serif';
-      case ReadingFontMode.kai:
-        return 'KaiTi';
-      case ReadingFontMode.custom:
-        return _customFontPath == null ? null : 'NWCustomFont';
+    if (_readingFontMode == ReadingFontMode.custom) {
+      return _customFontPath == null ? null : 'NWCustomFont';
     }
+    return _readingFontMode.family;
   }
 
   /// 供所有玻璃组件消费的材质参数。
@@ -324,10 +375,12 @@ class AppSettingsController extends ChangeNotifier {
     final double opacityRatio = _glassOpacity.clamp(0, 100) / 100;
 
     return GlassSpec(
-      // 100 对应 22 sigma：再高会明显拖慢中低端机的滚动帧率。
-      blurSigma: blurRatio * 22,
-      liquidTintOpacity: 0.05 + opacityRatio * 0.30,
-      panelOpacity: 0.14 + opacityRatio * 0.62,
+      // 100 对应 28 sigma：区间拉大后，滑块从头拖到尾的视觉差异才明显。
+      blurSigma: blurRatio * 28,
+      // 液态玻璃 0~100 对应 4%~46% 底色，透明与厚实的边界都能看清。
+      liquidTintOpacity: 0.04 + opacityRatio * 0.42,
+      // 毛玻璃面板 0~100 对应 10%~90%，低值真正通透、高值真正压低。
+      panelOpacity: 0.10 + opacityRatio * 0.80,
       borderWidth: _glassBorder.strokeWidth,
     );
   }
@@ -336,7 +389,8 @@ class AppSettingsController extends ChangeNotifier {
 
   /// 从本地存储读取设置。启动阶段调用，读取完成前不 notify。
   void load() {
-    _themeMode = _themeModeFromStorage(_storage.getString(StorageKeys.themeMode));
+    _themeMode =
+        _themeModeFromStorage(_storage.getString(StorageKeys.themeMode));
     _glassBlur = _storage
         .getInt(StorageKeys.glassBlur, fallback: _defaultGlassBlur)
         .clamp(0, 100)
@@ -352,6 +406,10 @@ class AppSettingsController extends ChangeNotifier {
       _storage.getString(StorageKeys.readingFontMode),
     );
     _customFontPath = _storage.getString(StorageKeys.customFontPath);
+    _decorationTone = decorationToneFromStorage(
+      _storage.getString(StorageKeys.decorationTone),
+    );
+    AppColors.decoration = _decorationTone.color;
     _watermarkEnabled = _storage.getBool(
       StorageKeys.watermarkEnabled,
       fallback: _defaultWatermarkEnabled,
@@ -366,6 +424,8 @@ class AppSettingsController extends ChangeNotifier {
       StorageKeys.reduceMotion,
       fallback: _defaultReduceMotion,
     );
+    disableMotion = _reduceMotion;
+    activeFps = _frameRate.fps;
   }
 
   // ---------------- 修改 ----------------
@@ -424,6 +484,17 @@ class AppSettingsController extends ChangeNotifier {
     await _storage.setString(StorageKeys.readingFontMode, mode.name);
   }
 
+  /// 切换装饰配色：立即作用于毛玻璃与控件装饰，并写入本地存储。
+  Future<void> setDecorationTone(DecorationTone tone) async {
+    if (_decorationTone == tone) {
+      return;
+    }
+    _decorationTone = tone;
+    AppColors.decoration = tone.color;
+    notifyListeners();
+    await _storage.setString(StorageKeys.decorationTone, tone.name);
+  }
+
   /// 记录新导入的第三方字体文件（仅当选择「自定义」时立刻生效）。
   Future<void> setCustomFontPath(String? path) async {
     _customFontPath = path;
@@ -458,6 +529,7 @@ class AppSettingsController extends ChangeNotifier {
       return;
     }
     _frameRate = option;
+    activeFps = option.fps;
     notifyListeners();
     await _storage.setString(StorageKeys.frameRate, option.name);
   }
@@ -467,6 +539,7 @@ class AppSettingsController extends ChangeNotifier {
       return;
     }
     _reduceMotion = value;
+    disableMotion = value;
     notifyListeners();
     await _storage.setBool(StorageKeys.reduceMotion, value);
   }
@@ -481,10 +554,14 @@ class AppSettingsController extends ChangeNotifier {
     _glassOpacity = _defaultGlassOpacity;
     _glassBorder = GlassBorderLevel.thin;
     _readingFontMode = _defaultFontMode;
+    _decorationTone = _defaultDecorationTone;
+    AppColors.decoration = null;
     _watermarkEnabled = _defaultWatermarkEnabled;
     _watermarkType = _defaultWatermarkType;
     _frameRate = _defaultFrameRate;
     _reduceMotion = _defaultReduceMotion;
+    disableMotion = _defaultReduceMotion;
+    activeFps = _defaultFrameRate.fps;
     notifyListeners();
 
     await _storage.setString(
@@ -497,6 +574,10 @@ class AppSettingsController extends ChangeNotifier {
     await _storage.setString(
       StorageKeys.readingFontMode,
       _readingFontMode.name,
+    );
+    await _storage.setString(
+      StorageKeys.decorationTone,
+      _decorationTone.name,
     );
     await _storage.setBool(StorageKeys.watermarkEnabled, _watermarkEnabled);
     await _storage.setString(StorageKeys.watermarkType, _watermarkType.name);
@@ -528,4 +609,65 @@ class AppSettingsController extends ChangeNotifier {
         return 'system';
     }
   }
+}
+
+/// 装饰配色（第 3 轮清单第 5 项）。
+///
+/// 只作用在毛玻璃与控件装饰上，浅色、深色模式都支持；
+/// 不修改两种模式原本的底色，阅读正文背景也不受影响。
+enum DecorationTone { none, blush, sky, mint, sakura, butter, lilac, mocha }
+
+extension DecorationToneX on DecorationTone {
+  String get label {
+    switch (this) {
+      case DecorationTone.none:
+        return '默认';
+      case DecorationTone.blush:
+        return '淡红';
+      case DecorationTone.sky:
+        return '天蓝';
+      case DecorationTone.mint:
+        return '浅绿';
+      case DecorationTone.sakura:
+        return '樱花粉';
+      case DecorationTone.butter:
+        return '淡黄';
+      case DecorationTone.lilac:
+        return '浅紫';
+      case DecorationTone.mocha:
+        return '深咖';
+    }
+  }
+
+  /// 装饰色；none 返回 null 表示不启用装饰。
+  Color? get color {
+    switch (this) {
+      case DecorationTone.none:
+        return null;
+      case DecorationTone.blush:
+        return const Color(0xFFD98C8C);
+      case DecorationTone.sky:
+        return const Color(0xFF7FB1DA);
+      case DecorationTone.mint:
+        return const Color(0xFF95C7AC);
+      case DecorationTone.sakura:
+        return const Color(0xFFDFA8BE);
+      case DecorationTone.butter:
+        return const Color(0xFFD9C27C);
+      case DecorationTone.lilac:
+        return const Color(0xFFAFA4DA);
+      case DecorationTone.mocha:
+        return const Color(0xFF8E7059);
+    }
+  }
+}
+
+/// 从存储值还原装饰配色。
+DecorationTone decorationToneFromStorage(String? value) {
+  for (final DecorationTone tone in DecorationTone.values) {
+    if (tone.name == value) {
+      return tone;
+    }
+  }
+  return DecorationTone.none;
 }

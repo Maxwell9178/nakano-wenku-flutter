@@ -53,7 +53,8 @@ class _CheckInPageState extends State<CheckInPage> {
   @override
   Widget build(BuildContext context) {
     final Brightness brightness = Theme.of(context).brightness;
-    final Set<int> checkedDays = widget.stats.checkedInDayNumbersOfMonth(_month);
+    final Set<int> checkedDays =
+        widget.stats.checkedInDayNumbersOfMonth(_month);
     final int monthDays = widget.stats.checkInDaysInMonth(_month);
 
     return Scaffold(
@@ -316,9 +317,7 @@ class _DayCell extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: borderColor, width: 0.8),
-            color: checked
-                ? AppColors.alpha(accent, 0.30)
-                : Colors.transparent,
+            color: checked ? AppColors.alpha(accent, 0.30) : Colors.transparent,
           ),
           alignment: Alignment.center,
           child: Text(

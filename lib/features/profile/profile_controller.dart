@@ -4,6 +4,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/models/book.dart';
 import '../../core/services/book_repository.dart';
 import '../../core/services/reading_stats_repository.dart';
+import '../../core/services/tag_weight_repository.dart';
 import '../../core/services/user_profile_controller.dart';
 
 /// 「我的」页面的展示层数据聚合。
@@ -20,13 +21,16 @@ class ProfileController extends ChangeNotifier {
     required BookRepository books,
     required ReadingStatsRepository stats,
     required UserProfileController profile,
+    required TagWeightRepository tagWeights,
   })  : _booksRepository = books,
         _stats = stats,
-        _profile = profile;
+        _profile = profile,
+        _tagWeights = tagWeights;
 
   final BookRepository _booksRepository;
   final ReadingStatsRepository _stats;
   final UserProfileController _profile;
+  final TagWeightRepository _tagWeights;
 
   List<Book> _books = const <Book>[];
   bool _loading = true;
@@ -66,10 +70,9 @@ class ProfileController extends ChangeNotifier {
       createdAt.day,
     );
     final DateTime today = DateTime.now();
-    final int days = DateTime(today.year, today.month, today.day)
-            .difference(start)
-            .inDays +
-        1;
+    final int days =
+        DateTime(today.year, today.month, today.day).difference(start).inDays +
+            1;
     return days < 1 ? 1 : days;
   }
 
@@ -87,8 +90,7 @@ class ProfileController extends ChangeNotifier {
 
   int get totalBooks => _books.length;
 
-  int get finishedBooks =>
-      _books.where((Book book) => book.isFinished).length;
+  int get finishedBooks => _books.where((Book book) => book.isFinished).length;
 
   int get unfinishedBooks => totalBooks - finishedBooks;
 
@@ -99,9 +101,8 @@ class ProfileController extends ChangeNotifier {
   Map<String, double> get tagRatios {
     final Map<String, double> ratios = <String, double>{};
     for (final String tag in AppConstants.presetTags) {
-      final int count = _books
-          .where((Book book) => book.tags.contains(tag))
-          .length;
+      final int count =
+          _books.where((Book book) => book.tags.contains(tag)).length;
       ratios[tag] = totalBooks == 0 ? 0 : count / totalBooks;
     }
     return ratios;
@@ -112,5 +113,30 @@ class ProfileController extends ChangeNotifier {
     return _books
         .where((Book book) => book.isFinished == finished)
         .toList(growable: false);
+  }
+
+  // ---------------- 阅读兴趣雷达 ----------------
+
+  /// 八维兴趣分值（0~1，顺序见 [TagWeightRepository.dimensions]）。
+  ///
+  /// 权重由「书籍标签 × 阅读时长」累加而来，阅读页每次退出都会刷新，
+  /// 这里只读已持久化的结果并归一化。
+  List<double> get tagRadar {
+    final Map<String, int> raw = _tagWeights.loadRaw();
+    return _tagWeights.normalized(raw);
+  }
+
+  /// 八维分值里最高的一项对应的维度名；全为 0 时返回 null。
+  String? get topTag {
+    final Map<String, int> raw = _tagWeights.loadRaw();
+    String? top;
+    int best = 0;
+    raw.forEach((String key, int value) {
+      if (value > best) {
+        best = value;
+        top = key;
+      }
+    });
+    return best > 0 ? top : null;
   }
 }

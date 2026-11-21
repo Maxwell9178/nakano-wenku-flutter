@@ -84,7 +84,10 @@ class _BookshelfPageState extends State<BookshelfPage> {
     final Book? current = controller.currentBook;
     final List<Book> visible = controller.visibleBooks;
 
-    return Column(
+    // 整个书架（轮播 + 信息区 + 筛选 + 藏书列表）放在同一个滚动视图里，
+    // 下半区不再拥有自己的局部滚动，滑动时页面整体移动。
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 118),
       children: <Widget>[
         const SizedBox(height: 2),
         BookCarousel(
@@ -94,50 +97,49 @@ class _BookshelfPageState extends State<BookshelfPage> {
           onCenterChanged: controller.selectIndex,
           onBookTap: _openDetail,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 18),
         if (current != null)
           BookInfoPanel(
             book: current,
             onOpenDetail: () => _openDetail(current),
           ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 22),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: SectionHeader(
-            title: '全部藏书',
-            english: 'LIBRARY',
-            trailing: Text(
-              '${visible.length} 本',
-              style: TextStyle(
-                fontSize: 10.5,
-                letterSpacing: 1.0,
-                color: AppColors.textTertiary(Theme.of(context).brightness),
+          // 左对齐：标题、英文标注、细线都从左侧起排。
+          child: SizedBox(
+            width: double.infinity,
+            child: SectionHeader(
+              title: '全部藏书',
+              english: 'LIBRARY',
+              alignment: CrossAxisAlignment.start,
+              trailing: Text(
+                '${visible.length} 本',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  letterSpacing: 1.0,
+                  color: AppColors.textTertiary(Theme.of(context).brightness),
+                ),
               ),
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         TagFilterBar(
           tags: controller.availableTags,
           activeTag: controller.activeTag,
           onSelected: controller.selectTag,
         ),
         const SizedBox(height: 6),
-        Expanded(
-          child: visible.isEmpty
-              ? _buildNoMatchState(context)
-              : ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 118),
-                  itemCount: visible.length,
-                  itemBuilder: (BuildContext context, int index) {
-                    final Book book = visible[index];
-                    return BookListItem(
-                      book: book,
-                      onTap: () => _openDetail(book),
-                    );
-                  },
-                ),
-        ),
+        if (visible.isEmpty)
+          SizedBox(height: 200, child: _buildNoMatchState(context))
+        else
+          ...visible.map(
+            (Book book) => BookListItem(
+              book: book,
+              onTap: () => _openDetail(book),
+            ),
+          ),
       ],
     );
   }

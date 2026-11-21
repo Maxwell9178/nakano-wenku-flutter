@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import '../constants/app_constants.dart';
 import '../constants/storage_keys.dart';
 import '../models/book.dart';
+import '../models/bookmark.dart';
 import '../models/chapter.dart';
 import '../models/excerpt.dart';
 import '../models/import_site.dart';
@@ -17,12 +18,14 @@ import '../models/reading_preferences.dart';
 import '../settings/app_settings.dart';
 import '../sync/appwrite_sync.dart';
 import 'book_repository.dart';
+import 'bookmark_repository.dart';
 import 'chapter_repository.dart';
 import 'excerpt_repository.dart';
 import 'import_site_repository.dart';
 import 'local_storage_service.dart';
 import 'reading_preferences_repository.dart';
 import 'reading_stats_repository.dart';
+import 'tag_weight_repository.dart';
 import 'user_profile_controller.dart';
 
 /// 数据包（.wkarchive）相关异常，message 可以直接展示给用户。
@@ -63,6 +66,8 @@ class WkArchivePayload {
     required this.glassBorderName,
     required this.includeBooks,
     required this.exportedAt,
+    this.bookmarks = const <Bookmark>[],
+    this.tagScores = const <String, int>{},
   });
 
   final String userName;
@@ -82,6 +87,10 @@ class WkArchivePayload {
   final String? glassBorderName;
   final bool includeBooks;
   final DateTime? exportedAt;
+
+  /// 书签与标签权重（旧备份包缺失时为空）。
+  final List<Bookmark> bookmarks;
+  final Map<String, int> tagScores;
 
   bool get hasAvatar => avatarBytes != null && avatarBytes!.isNotEmpty;
 
@@ -144,6 +153,8 @@ class WkArchiveService {
     required UserProfileController profile,
     required AppSettingsController settings,
     required LocalStorageService storage,
+    BookmarkRepository? bookmarks,
+    TagWeightRepository? tagWeights,
   })  : _books = books,
         _chapters = chapters,
         _readingPreferences = readingPreferences,
@@ -152,7 +163,9 @@ class WkArchiveService {
         _importSites = importSites,
         _profile = profile,
         _settings = settings,
-        _storage = storage;
+        _storage = storage,
+        _bookmarks = bookmarks,
+        _tagWeights = tagWeights;
 
   final BookRepository _books;
   final ChapterRepository _chapters;
@@ -163,6 +176,8 @@ class WkArchiveService {
   final UserProfileController _profile;
   final AppSettingsController _settings;
   final LocalStorageService _storage;
+  final BookmarkRepository? _bookmarks;
+  final TagWeightRepository? _tagWeights;
 
   static const String fileExtension = 'wkarchive';
   static const String infoFileName = 'info.json';
@@ -363,6 +378,10 @@ class WkArchiveService {
       },
       'importSites':
           _importSites.load().map((ImportSite item) => item.toJson()).toList(),
+      'bookmarks': (_bookmarks?.loadAll() ?? const <Bookmark>[])
+          .map((Bookmark item) => item.toJson())
+          .toList(),
+      'tagScores': _tagWeights?.loadRaw() ?? const <String, int>{},
     };
   }
 
@@ -505,6 +524,8 @@ class WkArchiveService {
       glassBorderName: _asString(settings['glassBorder']),
       includeBooks: includeBooks,
       exportedAt: _asDateTime(info['exportedAt']),
+      bookmarks: _parseBookmarks(info['bookmarks']),
+      tagScores: _asStringIntMap(info['tagScores']),
     );
   }
 
@@ -565,6 +586,10 @@ class WkArchiveService {
 
     // 4. 摘抄 / 偏好 / 统计 / 快捷站点
     await _excerpts.saveAll(payload.excerpts);
+    await _bookmarks?.saveAll(payload.bookmarks);
+    if (payload.tagScores.isNotEmpty) {
+      await _tagWeights?.saveRaw(payload.tagScores);
+    }
     await _readingPreferences.save(payload.preferences);
     await _stats.replaceAll(
       dailySeconds: payload.dailySeconds,
@@ -656,6 +681,40 @@ class WkArchiveService {
       totalSeconds: payload.totalSeconds,
     );
 
+    // 书签 / 批注：按 id 去重后追加（合并模式不覆盖本地已有记录）。
+    if (_bookmarks != null && payload.bookmarks.isNotEmpty) {
+      final BookmarkRepository store = _bookmarks!;
+      final List<Bookmark> local = store.loadAll();
+      final Set<String> ids = local.map((Bookmark item) => item.id).toSet();
+      bool changed = false;
+      for (final Bookmark item in payload.bookmarks) {
+        if (ids.add(item.id)) {
+          local.add(item);
+          changed = true;
+        }
+      }
+      if (changed) {
+        await store.saveAll(local);
+      }
+    }
+
+    // 标签权重：同名取较大值。
+    if (_tagWeights != null && payload.tagScores.isNotEmpty) {
+      final TagWeightRepository store = _tagWeights!;
+      final Map<String, int> merged = store.loadRaw();
+      bool changed = false;
+      payload.tagScores.forEach((String tag, int score) {
+        final int current = merged[tag] ?? 0;
+        if (score > current) {
+          merged[tag] = score;
+          changed = true;
+        }
+      });
+      if (changed) {
+        await store.saveRaw(merged);
+      }
+    }
+
     // 快捷站点：按网址合并。
     if (payload.importSites.isNotEmpty) {
       final List<ImportSite> sites = _importSites.load();
@@ -745,6 +804,37 @@ class WkArchiveService {
       }
     }
     return list;
+  }
+
+  List<Bookmark> _parseBookmarks(dynamic raw) {
+    if (raw is! List) {
+      return <Bookmark>[];
+    }
+    final List<Bookmark> list = <Bookmark>[];
+    for (final dynamic item in raw) {
+      if (item is Map) {
+        try {
+          list.add(Bookmark.fromJson(Map<String, dynamic>.from(item)));
+        } catch (_) {
+          // 单条书签损坏时跳过。
+        }
+      }
+    }
+    return list;
+  }
+
+  Map<String, int> _asStringIntMap(dynamic value) {
+    if (value is! Map) {
+      return <String, int>{};
+    }
+    final Map<String, int> result = <String, int>{};
+    value.forEach((dynamic key, dynamic raw) {
+      final int? parsed = _asInt(raw);
+      if (parsed != null) {
+        result['$key'] = parsed;
+      }
+    });
+    return result;
   }
 
   ReadingPreferences _parsePreferences(dynamic raw) {

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../features/book_detail/book_detail_page.dart';
+import '../../features/bookmarks/bookmark_list_page.dart';
+import '../../features/comic/comic_page.dart';
 import '../../features/home/home_shell.dart';
 import '../../features/import/import_page.dart';
 import '../../features/onboarding/onboarding_page.dart';
@@ -124,6 +126,35 @@ class AppRouter {
             settings: settings,
             builder: (BuildContext context) =>
                 ReaderPage(book: readerArguments),
+          );
+        }
+        return SoftPageRoute<void>(
+          settings: settings,
+          builder: (BuildContext context) =>
+              UnknownRoutePage(routeName: settings.name),
+        );
+
+      case AppRoutes.comic:
+        final Object? comicArguments = settings.arguments;
+        if (comicArguments is Book) {
+          return SoftPageRoute<void>(
+            settings: settings,
+            builder: (BuildContext context) => ComicPage(book: comicArguments),
+          );
+        }
+        return SoftPageRoute<void>(
+          settings: settings,
+          builder: (BuildContext context) =>
+              UnknownRoutePage(routeName: settings.name),
+        );
+
+      case AppRoutes.bookmarks:
+        final Object? bookmarkArguments = settings.arguments;
+        if (bookmarkArguments is Book) {
+          return SoftPageRoute<void>(
+            settings: settings,
+            builder: (BuildContext context) =>
+                BookmarkListPage(book: bookmarkArguments),
           );
         }
         return SoftPageRoute<void>(

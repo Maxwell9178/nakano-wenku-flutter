@@ -64,8 +64,7 @@ class ImportProgressCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          for (final ImportProgress progress
-              in progresses.take(3)) ...<Widget>[
+          for (final ImportProgress progress in progresses.take(3)) ...<Widget>[
             _ProgressRow(progress: progress),
             const SizedBox(height: 9),
           ],

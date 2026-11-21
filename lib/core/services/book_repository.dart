@@ -46,9 +46,8 @@ class BookRepository {
 
   /// 覆盖写入全部书籍。
   Future<void> saveAll(List<Book> books) async {
-    final List<Map<String, dynamic>> payload = books
-        .map((Book book) => book.toJson())
-        .toList();
+    final List<Map<String, dynamic>> payload =
+        books.map((Book book) => book.toJson()).toList();
     await _storage.setString(StorageKeys.books, jsonEncode(payload));
   }
 
@@ -68,7 +67,8 @@ class BookRepository {
       }
     }
     if (max < AppConstants.bookIdMax) {
-      return (max + 1).clamp(AppConstants.bookIdMin, AppConstants.bookIdMax)
+      return (max + 1)
+          .clamp(AppConstants.bookIdMin, AppConstants.bookIdMax)
           .toInt();
     }
     for (int candidate = AppConstants.bookIdMin;

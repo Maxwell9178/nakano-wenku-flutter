@@ -175,7 +175,8 @@ class _ExcerptPickerSheetState extends State<_ExcerptPickerSheet> {
                                     style: TextStyle(
                                       fontSize: 12.5,
                                       height: 1.75,
-                                      color: AppColors.textSecondary(brightness),
+                                      color:
+                                          AppColors.textSecondary(brightness),
                                     ),
                                   ),
                                 ),
@@ -194,8 +195,7 @@ class _ExcerptPickerSheetState extends State<_ExcerptPickerSheet> {
               onTap: _selected == null
                   ? null
                   : () {
-                      final String text =
-                          widget.paragraphs[_selected!].trim();
+                      final String text = widget.paragraphs[_selected!].trim();
                       Navigator.of(context).pop(text);
                     },
               child: Center(

@@ -83,8 +83,8 @@ class ReaderBackgroundView extends StatelessWidget {
           Image.file(
             File(path),
             fit: BoxFit.cover,
-            errorBuilder: (BuildContext context, Object error,
-                StackTrace? stackTrace) {
+            errorBuilder:
+                (BuildContext context, Object error, StackTrace? stackTrace) {
               return Container(color: const Color(0xFF101010));
             },
           ),

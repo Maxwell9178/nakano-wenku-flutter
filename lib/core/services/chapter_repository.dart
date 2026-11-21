@@ -110,7 +110,8 @@ class ChapterRepository {
     }
     try {
       final Directory dir = await _subDirectory('chapters');
-      final File source = File(p.join(dir.path, '${_fileStem(fromNumber)}.json'));
+      final File source =
+          File(p.join(dir.path, '${_fileStem(fromNumber)}.json'));
       if (!await source.exists()) {
         return;
       }
@@ -131,7 +132,8 @@ class ChapterRepository {
       if (!await source.exists()) {
         return null;
       }
-      final String extension = _normalizedImageExtension(p.extension(sourcePath));
+      final String extension =
+          _normalizedImageExtension(p.extension(sourcePath));
       final Directory dir = await _subDirectory('covers');
       final File target =
           File(p.join(dir.path, '${_fileStem(bookNumber)}$extension'));
@@ -204,7 +206,8 @@ class ChapterRepository {
   }
 
   /// 同书号的旧封面可能是 .png/.jpg 两种后缀，换图前先清掉。
-  Future<void> _removeExistingCovers(String directoryPath, int bookNumber) async {
+  Future<void> _removeExistingCovers(
+      String directoryPath, int bookNumber) async {
     final String stem = _fileStem(bookNumber);
     for (final String extension in <String>['.png', '.jpg', '.jpeg', '.webp']) {
       final File file = File(p.join(directoryPath, '$stem$extension'));

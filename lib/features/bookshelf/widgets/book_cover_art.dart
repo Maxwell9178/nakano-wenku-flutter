@@ -43,8 +43,7 @@ class BookCoverArt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Brightness brightness = Theme.of(context).brightness;
-    final double spineWidth =
-        (width * 0.075).clamp(7.0, 12.0).toDouble();
+    final double spineWidth = (width * 0.075).clamp(7.0, 12.0).toDouble();
 
     return SizedBox(
       width: width,
@@ -85,7 +84,8 @@ class BookCoverArt extends StatelessWidget {
                           maxLines: 1,
                           style: TextStyle(
                             fontFamily: AppFonts.serif,
-                            fontSize: (spineWidth * 0.72).clamp(6.5, 9.0).toDouble(),
+                            fontSize:
+                                (spineWidth * 0.72).clamp(6.5, 9.0).toDouble(),
                             letterSpacing: 1.2,
                             color: AppColors.alpha(Colors.white, 0.82),
                           ),

@@ -9,15 +9,14 @@ import 'pressable_scale.dart';
 
 /// 液态玻璃容器（全局公共组件）。
 ///
-/// 视觉要素：
-/// 1. BackdropFilter 背景模糊；
-/// 2. 斜向的玻璃底色渐变（左上偏亮、右下偏暗）；
-/// 3. 顶部反光 + 极细描边；
-/// 4. 外层柔和投影，制造「浮起」的厚度感。
+/// 第一轮重写要点：
+/// 1. 模糊区间放大到 0~28 sigma，滑块从头拖到尾差异肉眼可辨；
+/// 2. 底色改为「斜向渐变 + 顶部高光 + 底部内阴影 + 二次描边」四层，
+///    让玻璃有厚度，而不是一块半透明色块；
+/// 3. 描边只用白色 / 浅灰，不再出现任何金色。
 ///
-/// 模糊强度、透明度、边框粗细全部读取全局设置，保证一处调整、
-/// 全应用一致；局部需要特殊材质时可用 [blurSigma] / [opacity] /
-/// [borderWidth] 覆盖单次。
+/// 模糊强度、透明度、边框粗细读取全局设置，一处调整、全应用一致；
+/// 局部需要特殊材质时可用 [blurSigma] / [opacity] / [borderWidth] 覆盖。
 class LiquidGlass extends StatelessWidget {
   const LiquidGlass({
     super.key,
@@ -26,6 +25,7 @@ class LiquidGlass extends StatelessWidget {
     this.padding = EdgeInsets.zero,
     this.margin = EdgeInsets.zero,
     this.onTap,
+    this.onLongPress,
     this.tint,
     this.blurSigma,
     this.opacity,
@@ -44,6 +44,9 @@ class LiquidGlass extends StatelessWidget {
 
   /// 提供后整个玻璃面变成可点击区域（自动套用内缩回弹反馈）。
   final VoidCallback? onTap;
+
+  /// 可选的第二次交互（例如长按）。
+  final VoidCallback? onLongPress;
 
   /// 玻璃底色，默认跟随主题。
   final Color? tint;
@@ -68,19 +71,26 @@ class LiquidGlass extends StatelessWidget {
     final GlassSpec spec = context.watch<AppSettingsController>().glassSpec;
 
     final double sigma = blurSigma ?? spec.blurSigma;
-    final double fillOpacity = opacity ?? spec.liquidTintOpacity;
+    final double fillOpacity =
+        (opacity ?? spec.liquidTintOpacity).clamp(0.0, 1.0).toDouble();
     final double stroke = sheen ? (borderWidth ?? spec.borderWidth) : 0.0;
 
     final BorderRadius radius = BorderRadius.circular(borderRadius);
     final Color baseTint = tint ?? AppColors.glassTint(brightness);
 
-    final Color fillTop = AppColors.alpha(baseTint, fillOpacity + 0.05);
-    final Color fillBottom = AppColors.alpha(baseTint, fillOpacity * 0.55);
+    // 斜向渐变：左上更亮、右下更薄，模拟玻璃在光下的折射。
+    final Color fillTop = AppColors.alpha(baseTint, (fillOpacity + 0.10));
+    final Color fillMid = AppColors.alpha(baseTint, fillOpacity);
+    final Color fillBottom = AppColors.alpha(baseTint, fillOpacity * 0.48);
 
-    // 深色模式下描边更亮，浅色模式下更接近「玻璃边缘的高光」。
+    // 描边：深色模式偏亮，浅色模式用近白高光。
     final Color borderColor = AppColors.alpha(
       Colors.white,
-      isDark ? 0.26 : 0.72,
+      isDark ? 0.30 : 0.80,
+    );
+    final Color innerEdge = AppColors.alpha(
+      isDark ? Colors.black : Colors.white,
+      isDark ? 0.35 : 0.55,
     );
 
     final Widget glassSurface = ClipRRect(
@@ -103,13 +113,36 @@ class LiquidGlass extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: <Color>[fillTop, fillBottom],
+                  colors: <Color>[fillTop, fillMid, fillBottom],
+                  stops: const <double>[0.0, 0.45, 1.0],
                 ),
               ),
             ),
           ),
 
-          // 斜向反光
+          // 顶部高光带 + 底部内阴影：制造玻璃厚度。
+          if (sheen)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: <Color>[
+                        AppColors.alpha(Colors.white, isDark ? 0.16 : 0.42),
+                        AppColors.alpha(Colors.white, isDark ? 0.02 : 0.10),
+                        Colors.transparent,
+                        AppColors.alpha(Colors.black, isDark ? 0.22 : 0.05),
+                      ],
+                      stops: const <double>[0.0, 0.12, 0.55, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // 斜向反光（第二层折射）
           if (sheen)
             Positioned.fill(
               child: IgnorePointer(
@@ -119,11 +152,11 @@ class LiquidGlass extends StatelessWidget {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: <Color>[
-                        AppColors.alpha(Colors.white, isDark ? 0.10 : 0.30),
+                        AppColors.alpha(Colors.white, isDark ? 0.12 : 0.30),
                         Colors.transparent,
-                        AppColors.alpha(Colors.white, isDark ? 0.02 : 0.08),
+                        AppColors.alpha(Colors.white, isDark ? 0.03 : 0.10),
                       ],
-                      stops: const <double>[0.0, 0.42, 1.0],
+                      stops: const <double>[0.0, 0.38, 1.0],
                     ),
                   ),
                 ),
@@ -143,12 +176,12 @@ class LiquidGlass extends StatelessWidget {
             ? <BoxShadow>[
                 BoxShadow(
                   color: AppColors.alpha(
-                    isDark ? Colors.black : const Color(0xFF4B4B45),
-                    isDark ? 0.55 : 0.12,
+                    isDark ? Colors.black : const Color(0xFF3C3C38),
+                    isDark ? 0.56 : 0.16,
                   ),
-                  blurRadius: 26,
+                  blurRadius: 28,
                   spreadRadius: -6,
-                  offset: const Offset(0, 12),
+                  offset: const Offset(0, 14),
                 ),
               ]
             : null,
@@ -160,12 +193,34 @@ class LiquidGlass extends StatelessWidget {
               borderRadius: radius,
               border: Border.all(color: borderColor, width: stroke),
             ),
-      child: glassSurface,
+      child: Stack(
+        children: <Widget>[
+          glassSurface,
+          // 内圈描边：与外侧白边形成双线玻璃边缘。
+          if (sheen && stroke > 0.01)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Padding(
+                  padding: const EdgeInsets.all(1.2),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(
+                        (borderRadius - 1.2).clamp(0.0, borderRadius),
+                      ),
+                      border: Border.all(color: innerEdge, width: 0.6),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
 
-    if (onTap != null) {
+    if (onTap != null || onLongPress != null) {
       surface = PressableScale(
         onTap: onTap,
+        onLongPress: onLongPress,
         pressedScale: 0.975,
         child: surface,
       );

@@ -61,10 +61,8 @@ class CustomFontService {
     }
 
     final PlatformFile file = result.files.first;
-    final String extension = p
-        .extension(file.name)
-        .replaceFirst('.', '')
-        .toLowerCase();
+    final String extension =
+        p.extension(file.name).replaceFirst('.', '').toLowerCase();
     if (!fontExtensions.contains(extension)) {
       throw const CustomFontException('只支持 ttf / otf / ttc 字体文件');
     }
@@ -113,8 +111,8 @@ class CustomFontService {
 
   /// 移除已导入的字体（文件 + 记录 + 注册状态）。
   Future<void> clear() async {
-    final String? path = _loadedPath ??
-        _storage.getString(StorageKeys.customFontPath);
+    final String? path =
+        _loadedPath ?? _storage.getString(StorageKeys.customFontPath);
     if (path != null && path.isNotEmpty) {
       final File file = File(path);
       if (file.existsSync()) {

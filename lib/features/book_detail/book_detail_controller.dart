@@ -30,7 +30,8 @@ class BookDetailController extends ChangeNotifier {
   List<Chapter> get chapters => _chapters;
   bool get loading => _loading;
   bool get hasChapters => _chapters.isNotEmpty;
-  int get chapterCount => _chapters.isNotEmpty ? _chapters.length : _book.chapterCount;
+  int get chapterCount =>
+      _chapters.isNotEmpty ? _chapters.length : _book.chapterCount;
 
   /// 目录里的真实字数优先；章节文件缺失时回落到书籍元数据。
   int get totalWords {
@@ -60,7 +61,8 @@ class BookDetailController extends ChangeNotifier {
     if (title == null || title.isEmpty || _chapters.isEmpty) {
       return 0;
     }
-    final int index = _chapters.indexWhere((Chapter chapter) => chapter.title == title);
+    final int index =
+        _chapters.indexWhere((Chapter chapter) => chapter.title == title);
     return index < 0 ? 0 : index;
   }
 

@@ -44,14 +44,14 @@ class BookCarousel extends StatefulWidget {
 }
 
 class _BookCarouselState extends State<BookCarousel> {
-  /// 单页占视口比例：越小，相邻书籍越靠近，形成密集书架感。
-  static const double _viewportFraction = 0.46;
+  /// 单页占视口比例：约 1/3，保证单屏同时看清中间一本 + 左右各一本。
+  static const double _viewportFraction = 0.34;
 
   /// 书本 X 轴固定下倾角度（需求硬性规定 13°）。
   static const double _tiltXDegree = 13;
 
-  /// 侧边书籍最大 Y 轴旋转角，转到 60° 时只看到书脊。
-  static const double _maxYawDegree = 60;
+  /// 侧边书籍最大 Y 轴旋转角，转到 52° 时以书脊 + 少量封面示人。
+  static const double _maxYawDegree = 52;
 
   late final PageController _controller;
 
@@ -95,8 +95,7 @@ class _BookCarouselState extends State<BookCarousel> {
 
     // 只在跨过整数本时通知外部，信息区按书籍变化淡入刷新。
     if (centerChanged) {
-      final int index =
-          next.round().clamp(0, widget.books.length - 1).toInt();
+      final int index = next.round().clamp(0, widget.books.length - 1).toInt();
       widget.onCenterChanged(index);
     }
   }
@@ -169,6 +168,38 @@ class _BookCarouselState extends State<BookCarousel> {
                   },
                 ),
               ),
+
+              // 底部页码：<0001/0020>，随滑动实时更新。
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: _controller,
+                    builder: (BuildContext context, Widget? child) {
+                      final int total = widget.books.length;
+                      final double page = _controller.hasClients
+                          ? (_controller.page ?? _page)
+                          : _page;
+                      final int current =
+                          (page.round() + 1).clamp(1, total).toInt();
+                      return Center(
+                        child: Text(
+                          '<${current.toString().padLeft(4, '0')}/'
+                          '${total.toString().padLeft(4, '0')}>',
+                          style: TextStyle(
+                            fontFamily: 'serif',
+                            fontSize: 9.5,
+                            letterSpacing: 1.8,
+                            color: AppColors.textTertiary(brightness),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
             ],
           );
         },
@@ -181,9 +212,8 @@ class _BookCarouselState extends State<BookCarousel> {
     required double stageHeight,
   }) {
     final Book book = widget.books[index];
-    final double page = _controller.hasClients
-        ? (_controller.page ?? _page)
-        : _page;
+    final double page =
+        _controller.hasClients ? (_controller.page ?? _page) : _page;
 
     // 相对居中的连续偏移量：0 = 正中，±1 = 左右相邻。
     final double offset = index - page;
@@ -197,14 +227,19 @@ class _BookCarouselState extends State<BookCarousel> {
     final double turn =
         _smoothStep((1 - distance / 0.82).clamp(0.0, 1.0).toDouble());
 
-    // Y 轴旋转角：随距离增加，侧边书籍最大 60°。
-    final double yawRatio = _smoothStep((distance / 0.86).clamp(0.0, 1.0).toDouble());
+    // Y 轴旋转角：随距离增加，侧边书籍最大 52°。
+    final double yawRatio =
+        _smoothStep((distance / 0.86).clamp(0.0, 1.0).toDouble());
     final double yaw = -offset.sign * _maxYawDegree * math.pi / 180 * yawRatio;
 
-    // 几何尺寸：正中书籍略大；侧边书籍宽度收窄到只留书脊。
-    final double coverHeight = stageHeight * 0.50 * (1 + 0.12 * turn);
+    // 透视缩放：离中心越远整体越小，强化前后层次。
+    final double depthScale = 1 - 0.16 * (distance / 2).clamp(0.0, 1.0);
+
+    // 几何尺寸：正中书籍略大；侧边书籍宽度收窄到书脊厚度。
+    final double coverHeight =
+        stageHeight * 0.50 * (1 + 0.12 * turn) * depthScale;
     final double baseWidth = coverHeight * 0.70;
-    final double coverWidth = baseWidth * (0.26 + 0.74 * turn);
+    final double coverWidth = baseWidth * (0.34 + 0.66 * turn);
 
     // 抬升高度 = 书高的 60%，并在斜上方 45° 方向偏移。
     final double lift = coverHeight * 0.60 * liftRatio;
@@ -232,7 +267,7 @@ class _BookCarouselState extends State<BookCarousel> {
           children: <Widget>[
             Positioned(
               left: (baseWidth - coverWidth) / 2,
-              bottom: stageHeight * 0.04,
+              bottom: stageHeight * 0.085,
               width: coverWidth,
               height: coverHeight,
               child: Opacity(

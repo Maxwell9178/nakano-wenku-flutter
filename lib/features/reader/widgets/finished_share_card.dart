@@ -42,7 +42,7 @@ class FinishedShareCard extends StatelessWidget {
     return Container(
       width: 282,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -282,8 +282,7 @@ class _FinishedShareDialogState extends State<_FinishedShareDialog> {
         if (!await folder.exists()) {
           await folder.create(recursive: true);
         }
-        final String path =
-            '${folder.path}${Platform.pathSeparator}finished_'
+        final String path = '${folder.path}${Platform.pathSeparator}finished_'
             '${DateTime.now().millisecondsSinceEpoch}.png';
         await File(path).writeAsBytes(bytes, flush: true);
         if (mounted) {

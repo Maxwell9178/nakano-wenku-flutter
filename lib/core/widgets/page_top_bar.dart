@@ -43,11 +43,11 @@ class PageTopBar extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: AppColors.alpha(AppColors.divider(brightness), 0.9),
+                      color:
+                          AppColors.alpha(AppColors.divider(brightness), 0.9),
                       width: 0.8,
                     ),
-                    color: AppColors.alpha(
-                        AppColors.surface(brightness), 0.35),
+                    color: AppColors.alpha(AppColors.surface(brightness), 0.35),
                   ),
                   child: Icon(
                     Icons.arrow_back_rounded,
@@ -73,7 +73,8 @@ class PageTopBar extends StatelessWidget {
                       english.toUpperCase(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTypography.englishLabel(brightness, fontSize: 8.2)
+                      style: AppTypography.englishLabel(brightness,
+                              fontSize: 8.2)
                           .copyWith(color: AppColors.textTertiary(brightness)),
                     ),
                   ],

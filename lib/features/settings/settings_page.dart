@@ -148,17 +148,19 @@ class _SettingsPageState extends State<SettingsPage> {
                   padding: const EdgeInsets.fromLTRB(24, 18, 24, 40),
                   children: <Widget>[
                     _buildAppearanceCard(brightness, settings, accent),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 30),
+                    _buildDecorationCard(brightness, settings, accent),
+                    const SizedBox(height: 30),
                     _buildFontCard(brightness, settings, accent),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 30),
                     _buildReadingPreferenceCard(brightness, accent),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 30),
                     _buildWatermarkCard(brightness, settings, accent),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 30),
                     _buildLibraryCard(brightness, accent),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 30),
                     _buildPerformanceCard(brightness, settings, accent),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 30),
                     _buildAboutCard(brightness, accent),
                     const SizedBox(height: 28),
                     Center(
@@ -369,6 +371,53 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   // ---------------- 阅读字体 ----------------
+
+  Widget _buildDecorationCard(
+    Brightness brightness,
+    AppSettingsController settings,
+    Color accent,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const SectionHeader(title: '装饰配色', english: 'DECORATION'),
+        const SizedBox(height: 12),
+        LiquidGlass(
+          borderRadius: 24,
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                '装饰色只给毛玻璃与控件加一层淡淡的色调，浅色、深色模式都适用；'
+                '不改动原有底色，阅读正文背景也不受影响。',
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.7,
+                  color: AppColors.textSecondary(brightness),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: <Widget>[
+                  for (final DecorationTone tone in DecorationTone.values)
+                    _ToneSwatch(
+                      tone: tone,
+                      selected: settings.decorationTone == tone,
+                      brightness: brightness,
+                      accent: accent,
+                      onTap: () => settings.setDecorationTone(tone),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildFontCard(
     Brightness brightness,
@@ -1390,6 +1439,72 @@ class _GlassSwitch extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 装饰配色色样：圆角小色块 + 名称，选中时描一圈强调色。
+class _ToneSwatch extends StatelessWidget {
+  const _ToneSwatch({
+    required this.tone,
+    required this.selected,
+    required this.brightness,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final DecorationTone tone;
+  final bool selected;
+  final Brightness brightness;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color? color = tone.color;
+    return PressableScale(
+      pressedScale: 0.94,
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          AnimatedContainer(
+            duration: AppSettingsController.motion(180),
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: color ??
+                  AppColors.alpha(AppColors.textPrimary(brightness), 0.04),
+              border: Border.all(
+                color: selected
+                    ? accent
+                    : AppColors.alpha(AppColors.textPrimary(brightness), 0.16),
+                width: selected ? 1.8 : 0.9,
+              ),
+              boxShadow: selected
+                  ? <BoxShadow>[
+                      BoxShadow(
+                          color: AppColors.alpha(color ?? accent, 0.45),
+                          blurRadius: 10)
+                    ]
+                  : null,
+            ),
+            child: color == null
+                ? Icon(Icons.block_rounded,
+                    size: 13, color: AppColors.textTertiary(brightness))
+                : null,
+          ),
+          const SizedBox(height: 5),
+          Text(
+            tone.label,
+            style: TextStyle(
+              fontSize: 9.5,
+              color: selected ? accent : AppColors.textTertiary(brightness),
+            ),
+          ),
+        ],
       ),
     );
   }

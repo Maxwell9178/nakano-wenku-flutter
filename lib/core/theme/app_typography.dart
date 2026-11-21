@@ -192,8 +192,9 @@ class AppTypography {
 
   /// 把阅读字体偏好套用到整套主题上。
   ///
-  /// 只覆盖正文 / Small / Label 这些「可被用户替换」的类别；
-  /// 中文大标题与英文标注始终保留衬线体，维持品牌排版。
+  /// 只覆盖阅读正文、界面小字这些「可被用户替换」的类别；
+  /// 中文大标题（display/headline/titleLarge）与英文标注（labelLarge）
+  /// 始终保留衬线体，避免用户导入的字体把标题也改掉。
   static ThemeData themeWithFont(ThemeData base, String? family) {
     if (family == null) {
       return base;
@@ -202,6 +203,13 @@ class AppTypography {
     final TextTheme source = base.textTheme;
     return base.copyWith(
       textTheme: source.copyWith(
+        // 标题类：显式写回衬线体，防止被外层 DefaultTextStyle 污染。
+        displayLarge: _forceSerif(source.displayLarge),
+        headlineLarge: _forceSerif(source.headlineLarge),
+        headlineMedium: _forceSerif(source.headlineMedium),
+        titleLarge: _forceSerif(source.titleLarge),
+        labelLarge: _forceSerif(source.labelLarge),
+        labelSmall: _forceSerif(source.labelSmall),
         bodyLarge: source.bodyLarge?.copyWith(
           fontFamily: family,
           fontFamilyFallback: fallback,
@@ -214,11 +222,8 @@ class AppTypography {
           fontFamily: family,
           fontFamilyFallback: fallback,
         ),
+        // 书名小字跟随字体设置，这是需求明确允许的类别。
         titleMedium: source.titleMedium?.copyWith(
-          fontFamily: family,
-          fontFamilyFallback: fallback,
-        ),
-        labelLarge: source.labelLarge?.copyWith(
           fontFamily: family,
           fontFamilyFallback: fallback,
         ),
@@ -227,6 +232,16 @@ class AppTypography {
           fontFamilyFallback: fallback,
         ),
       ),
+    );
+  }
+
+  static TextStyle? _forceSerif(TextStyle? style) {
+    if (style == null) {
+      return null;
+    }
+    return style.copyWith(
+      fontFamily: AppFonts.serif,
+      fontFamilyFallback: AppFonts.serifFallback,
     );
   }
 }

@@ -47,8 +47,9 @@ class UserProfileController extends ChangeNotifier {
   bool get onboardingCompleted => _onboardingCompleted;
 
   /// 展示用昵称，未设置时使用兜底文案。
-  String get displayName =>
-      _userName.trim().isEmpty ? AppConstants.defaultUserName : _userName.trim();
+  String get displayName => _userName.trim().isEmpty
+      ? AppConstants.defaultUserName
+      : _userName.trim();
 
   // ---------------- 初始化 ----------------
 

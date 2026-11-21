@@ -174,6 +174,7 @@ class BookImportService {
     ImportPlan plan, {
     VolumeImportMode mode = VolumeImportMode.separate,
     Set<int> mergeSelection = const <int>{},
+    String? groupLabel,
     void Function(ImportProgress progress)? onProgress,
   }) async {
     if (!plan.hasVolumes) {
@@ -183,8 +184,14 @@ class BookImportService {
     final List<Book> existing = _books.loadAll();
     int nextNumber = _books.nextNumber(existing);
 
-    final List<List<ImportedVolume>> groups =
-        _buildGroups(plan.volumes, mode, mergeSelection);
+    final List<List<ImportedVolume>> groups = _buildGroups(
+      plan.volumes,
+      // 漫画始终一本一文件入库，避免把不同作品合并成一本书。
+      plan.volumes.any((ImportedVolume volume) => volume.document.isComic)
+          ? VolumeImportMode.separate
+          : mode,
+      mergeSelection,
+    );
     final List<Book> created = <Book>[];
 
     for (final List<ImportedVolume> group in groups) {
@@ -248,6 +255,10 @@ class BookImportService {
         chapterCount: chapters.length,
         tags: const <String>[],
         addedAt: DateTime.now(),
+        isComic: group.first.document.isComic,
+        group: (groupLabel == null || groupLabel.trim().isEmpty)
+            ? null
+            : groupLabel.trim(),
       );
       created.add(book);
 

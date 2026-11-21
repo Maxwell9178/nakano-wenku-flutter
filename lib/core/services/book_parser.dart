@@ -6,6 +6,7 @@ import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
 
 import '../models/chapter.dart';
+import 'comic_parser.dart';
 
 /// 解析失败时抛出，`message` 直接用于界面提示。
 class BookParseException implements Exception {
@@ -26,6 +27,7 @@ class ParsedBook {
     required this.sourceName,
     this.coverBytes,
     this.coverExtension = 'png',
+    this.isComic = false,
   });
 
   final String title;
@@ -33,14 +35,17 @@ class ParsedBook {
   final List<Chapter> chapters;
   final String sourceName;
 
+  /// 是否为漫画（CBX / CBZ 图片包）。为真时章节正文保存的是图片路径。
+  final bool isComic;
+
   /// EPUB 内嵌封面；为空时书架绘制灰色占位封面。
   final Uint8List? coverBytes;
 
   /// 封面扩展名（不带点）。
   final String coverExtension;
 
-  int get wordCount =>
-      chapters.fold<int>(0, (int sum, Chapter chapter) => sum + chapter.wordCount);
+  int get wordCount => chapters.fold<int>(
+      0, (int sum, Chapter chapter) => sum + chapter.wordCount);
 }
 
 /// 纯 Dart 电子书解析器。
@@ -66,6 +71,8 @@ class BookParser {
     'markdown',
     'docx',
     'zip',
+    'cbx',
+    'cbz',
   };
 
   // ---------------- 对外入口 ----------------
@@ -97,6 +104,9 @@ class BookParser {
         ];
       case 'zip':
         return _parseZipBytes(await File(path).readAsBytes(), displayName);
+      case 'cbx':
+      case 'cbz':
+        return <ParsedBook>[await _parseComicFile(path, displayName)];
       case 'pdf':
         throw BookParseException(
           'PDF 正文解析暂未支持，请先转换为 TXT 或 EPUB 后再导入。',
@@ -110,6 +120,30 @@ class BookParser {
     }
   }
 
+  // ---------------- 漫画（CBX / CBZ） ----------------
+
+  /// 漫画包：解压图片为页，一页一章，正文位置存图片绝对路径。
+  Future<ParsedBook> _parseComicFile(String path, String displayName) async {
+    try {
+      final ParsedComic comic = await ComicParser().parseFile(
+        path,
+        fallbackTitle: p.basenameWithoutExtension(path),
+      );
+      final List<int>? rawCover = comic.coverBytes;
+      return ParsedBook(
+        title: comic.title,
+        author: '佚名',
+        chapters: comic.toChapters(),
+        sourceName: displayName,
+        coverBytes: rawCover == null ? null : Uint8List.fromList(rawCover),
+        coverExtension: comic.coverExtension,
+        isComic: true,
+      );
+    } on ComicParseException catch (error) {
+      throw BookParseException('漫画解析失败：${error.message}');
+    }
+  }
+
   // ---------------- EPUB ----------------
 
   Future<ParsedBook> _parseEpubBytes(
@@ -120,7 +154,8 @@ class BookParser {
 
     // 1. 从 META-INF/container.xml 找到 OPF 路径。
     String opfPath = '';
-    final ArchiveFile? container = _findEntry(archive, 'META-INF/container.xml');
+    final ArchiveFile? container =
+        _findEntry(archive, 'META-INF/container.xml');
     if (container != null) {
       final String containerXml = _decodeText(_entryBytes(container));
       final RegExpMatch? match =
@@ -172,7 +207,8 @@ class BookParser {
     // 3. 按 spine 顺序取正文。
     final List<Chapter> chapters = <Chapter>[];
     for (final RegExpMatch match
-        in RegExp(r'<itemref\b[^>]*>', caseSensitive: false).allMatches(opfXml)) {
+        in RegExp(r'<itemref\b[^>]*>', caseSensitive: false)
+            .allMatches(opfXml)) {
       final String? idref = _attribute(match.group(0)!, 'idref');
       if (idref == null) {
         continue;
@@ -275,12 +311,12 @@ class BookParser {
     String extension,
   ) async {
     final String raw = _decodeText(bytes);
-    final String text = _stripBom(raw).replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    final String text =
+        _stripBom(raw).replaceAll('\r\n', '\n').replaceAll('\r', '\n');
 
-    final List<Chapter> chapters =
-        extension == 'md' || extension == 'markdown'
-            ? _splitMarkdown(text)
-            : _splitPlainChapters(text);
+    final List<Chapter> chapters = extension == 'md' || extension == 'markdown'
+        ? _splitMarkdown(text)
+        : _splitPlainChapters(text);
 
     if (chapters.isEmpty) {
       throw BookParseException('没有解析到正文内容');
@@ -309,7 +345,8 @@ class BookParser {
       return <Chapter>[];
     }
 
-    final List<RegExpMatch> matches = _chapterHeading.allMatches(content).toList();
+    final List<RegExpMatch> matches =
+        _chapterHeading.allMatches(content).toList();
     if (matches.length < 2) {
       // 没有章节标记：按长度分块，避免一本书变成一条超长文本。
       return _splitByLength(content, '正文');
@@ -323,8 +360,9 @@ class BookParser {
     }
 
     for (int index = 0; index < matches.length; index++) {
-      final int end =
-          index + 1 < matches.length ? matches[index + 1].start : content.length;
+      final int end = index + 1 < matches.length
+          ? matches[index + 1].start
+          : content.length;
       final String body = content.substring(matches[index].end, end).trim();
       final String title = matches[index].group(1)!.trim();
       chapters.add(Chapter.fromText(title, body));
@@ -340,15 +378,18 @@ class BookParser {
     }
 
     final List<RegExpMatch> matches =
-        RegExp(r'^#{1,3}[ \t]+(.+)$', multiLine: true).allMatches(content).toList();
+        RegExp(r'^#{1,3}[ \t]+(.+)$', multiLine: true)
+            .allMatches(content)
+            .toList();
     if (matches.length < 2) {
       return _splitPlainChapters(content);
     }
 
     final List<Chapter> chapters = <Chapter>[];
     for (int index = 0; index < matches.length; index++) {
-      final int end =
-          index + 1 < matches.length ? matches[index + 1].start : content.length;
+      final int end = index + 1 < matches.length
+          ? matches[index + 1].start
+          : content.length;
       final String rawBody = content.substring(matches[index].end, end);
       final String title = _stripMarkdown(matches[index].group(1)!).trim();
       final String body = _stripMarkdown(rawBody).trim();
@@ -718,10 +759,10 @@ class BookParser {
   }
 
   String? _attribute(String tag, String name) {
-    final RegExpMatch? match =
-        RegExp('$name\\s*=\\s*"([^"]*)"', caseSensitive: false).firstMatch(tag) ??
-            RegExp("$name\\s*=\\s*'([^']*)'", caseSensitive: false)
-                .firstMatch(tag);
+    final RegExpMatch? match = RegExp('$name\\s*=\\s*"([^"]*)"',
+                caseSensitive: false)
+            .firstMatch(tag) ??
+        RegExp("$name\\s*=\\s*'([^']*)'", caseSensitive: false).firstMatch(tag);
     return match?.group(1);
   }
 
@@ -744,7 +785,8 @@ class BookParser {
 
     final List<String> segments = <String>[];
     if (baseDirectory.isNotEmpty) {
-      segments.addAll(baseDirectory.split('/').where((String item) => item.isNotEmpty));
+      segments.addAll(
+          baseDirectory.split('/').where((String item) => item.isNotEmpty));
     }
     for (final String segment in target.split('/')) {
       if (segment.isEmpty || segment == '.') {

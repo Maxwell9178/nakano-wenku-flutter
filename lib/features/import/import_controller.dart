@@ -31,6 +31,8 @@ class ImportController extends ChangeNotifier {
     'markdown',
     'docx',
     'zip',
+    'cbx',
+    'cbz',
     'pdf',
     'doc',
   ];
@@ -42,12 +44,16 @@ class ImportController extends ChangeNotifier {
     'markdown',
     'docx',
     'zip',
+    'cbx',
+    'cbz',
   };
 
   List<LocalFileEntry> _entries = const <LocalFileEntry>[];
   final Set<String> _selectedPaths = <String>{};
   final Map<int, ImportProgress> _progresses = <int, ImportProgress>{};
-  List<ImportSite> _sites = const <ImportSite>[ImportSiteRepository.defaultSite];
+  List<ImportSite> _sites = const <ImportSite>[
+    ImportSiteRepository.defaultSite
+  ];
   List<String> _failures = const <String>[];
 
   bool _scanning = false;
@@ -68,7 +74,8 @@ class ImportController extends ChangeNotifier {
   /// 进度卡片按文件下标升序展示。
   List<ImportProgress> get progresses {
     final List<ImportProgress> list = _progresses.values.toList()
-      ..sort((ImportProgress a, ImportProgress b) => a.index.compareTo(b.index));
+      ..sort(
+          (ImportProgress a, ImportProgress b) => a.index.compareTo(b.index));
     return list;
   }
 
@@ -80,6 +87,8 @@ class ImportController extends ChangeNotifier {
     'markdown',
     'docx',
     'zip',
+    'cbx',
+    'cbz',
   };
 
   bool supportedForParsing(String extension) =>
@@ -190,6 +199,9 @@ class ImportController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 上一次使用的分组标签，作为下次导入时的默认值。
+  String? lastGroup;
+
   /// 解析选中文件。返回值交给页面决定是否弹「多卷导入方式」。
   Future<ImportPlan?> prepareSelected() async {
     if (_importing || _selectedPaths.isEmpty) {
@@ -215,15 +227,20 @@ class ImportController extends ChangeNotifier {
   }
 
   /// 按策略写库。
+  ///
+  /// [group] 为可选的导入分组标签：留空表示不分组，
+  /// 写入后会记在每本书上，供书架与搜索筛选。
   Future<ImportOutcome?> commitPlan(
     ImportPlan plan, {
     required VolumeImportMode mode,
     Set<int> mergeSelection = const <int>{},
+    String? group,
   }) async {
     final ImportOutcome outcome = await _importService.commit(
       plan,
       mode: mode,
       mergeSelection: mergeSelection,
+      groupLabel: group,
       onProgress: _handleProgress,
     );
     _failures = outcome.failures;
@@ -252,6 +269,23 @@ class ImportController extends ChangeNotifier {
 
   Future<void> removeSite(String id) async {
     _sites = _sites.where((ImportSite site) => site.id != id).toList();
+    await _siteRepository.save(_sites);
+    notifyListeners();
+  }
+
+  /// 修改已有站点的名称与网址，保持原有顺序与编号位置。
+  Future<void> updateSite({
+    required String id,
+    required String name,
+    required String url,
+  }) async {
+    _sites = _sites
+        .map(
+          (ImportSite site) => site.id == id
+              ? ImportSite(id: site.id, name: name, url: url)
+              : site,
+        )
+        .toList();
     await _siteRepository.save(_sites);
     notifyListeners();
   }

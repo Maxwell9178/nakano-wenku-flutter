@@ -30,3 +30,6 @@ Thumbs.db
 
 # 生成物
 *.log
+
+# 打包产物（走 GitHub Releases 分发，不入库）
+dist/
