@@ -15,17 +15,19 @@ import 'app_colors.dart';
 class AppFonts {
   const AppFonts._();
 
-  /// 系统衬线字体族（Android 会解析为 Noto Serif 系列）。
-  static const String serif = 'serif';
+  /// 内置宋体（Noto Serif SC 子集，随包分发）。
+  ///
+  /// 用内置字族而不是泛型 `serif`：后者在不少国产 ROM 上会被解析成无衬线，
+  /// 导致中文标题看起来像黑体。字形缺失时再回退到系统宋体链。
+  static const String serif = 'NWSerif';
 
-  /// 中文宋体回退链，覆盖主流 Android 定制系统与 iOS。
+  /// 中文宋体回退链，覆盖内置字缺失字形与第三方 ROM 差异。
   static const List<String> serifFallback = <String>[
-    'Songti SC',
-    'STSong',
     'Noto Serif CJK SC',
     'Noto Serif SC',
     'Source Han Serif SC',
-    'NotoSerifCJK-Regular',
+    'Songti SC',
+    'STSong',
     'serif',
   ];
 }

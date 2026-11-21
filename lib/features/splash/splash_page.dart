@@ -148,9 +148,9 @@ class _SplashPageState extends State<SplashPage>
                                 style: AppTypography.textTheme(brightness)
                                     .displayLarge
                                     ?.copyWith(
-                                      fontSize: 38,
-                                      letterSpacing: 6.0,
-                                      fontWeight: FontWeight.w700,
+                                      fontSize: 36,
+                                      letterSpacing: 3.2,
+                                      fontWeight: FontWeight.w600,
                                     ),
                               ),
                             ),

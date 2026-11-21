@@ -68,7 +68,7 @@ class AppShareCard extends StatelessWidget {
                           Text(
                             'NAKANO WENKU',
                             style: TextStyle(
-                              fontFamily: 'serif',
+                              fontFamily: AppFonts.serif,
                               fontSize: 8.6,
                               letterSpacing: 2.4,
                               color: _ink.withValues(alpha: 0.55),

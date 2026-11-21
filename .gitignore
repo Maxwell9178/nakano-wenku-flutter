@@ -33,3 +33,5 @@ Thumbs.db
 
 # 打包产物（走 GitHub Releases 分发，不入库）
 dist/
+app-release.apk
+*.apk

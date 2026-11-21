@@ -13,14 +13,23 @@ class ImportSiteRepository {
 
   final LocalStorageService _storage;
 
-  /// 默认站点：成为小说家吧（轻小说资源站）。
+  /// 默认站点：本项目在 GitHub 上的仓库地址，方便第一次使用的人去看更新与源码。
   static const ImportSite defaultSite = ImportSite(
-    id: 'default-syosetu',
-    name: '小说家',
-    url: 'https://syosetu.com/',
+    id: 'default-github',
+    name: 'GitHub地址',
+    url: 'https://github.com/Maxwell9178/nakano-wenku-flutter',
   );
 
   List<ImportSite> load() {
+    final List<ImportSite> sites = _loadRaw();
+    // 老版本存过别的默认站点，这里补上 GitHub 入口但不覆盖用户自己的配置。
+    if (!sites.any((ImportSite site) => site.id == defaultSite.id)) {
+      return <ImportSite>[defaultSite, ...sites];
+    }
+    return sites;
+  }
+
+  List<ImportSite> _loadRaw() {
     final String? raw = _storage.getString(StorageKeys.importSites);
     if (raw == null || raw.isEmpty) {
       return <ImportSite>[defaultSite];

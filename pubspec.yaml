@@ -4,7 +4,7 @@ publish_to: "none"
 
 # 版本号规则：versionName+versionCode。
 # 后续版本更新模块中的 version.json 需要与这里保持一致。
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -56,7 +56,13 @@ flutter:
     - assets/images/
     - assets/data/
 
+  # 内置一套宋体（Noto Serif SC 子集，仅 GB2312 + ASCII，约 2.2MB），
+  # 保证所有 Android 机型上的中文大标题都是同一个宋体观感。
+  fonts:
+    - family: NWSerif
+      fonts:
+        - asset: assets/fonts/NWSerifSC-Regular.otf
+
   # 说明：
-  # 1. 中文标题、英文署名优先使用系统衬线字体族 + 常见中文宋体回退，
-  #    不强制内置字体文件，用户可在后续「设置」中自行导入第三方字体。
+  # 1. 中文标题统一走内置 NWSerif，缺失字形回退到系统宋体链。
   # 2. 正文跟随系统字体，保证第三方字体兼容性。

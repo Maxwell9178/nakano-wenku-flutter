@@ -176,7 +176,7 @@ class _ImportPageState extends State<ImportPage> {
                 const SizedBox(width: 18),
                 SiteBall(
                   site: _c.sites[i],
-                  index: i,
+                  index: i + 1,
                   onTap: () => _openSite(_c.sites[i]),
                   onLongPress: () => _siteActions(_c.sites[i]),
                 ),
@@ -684,9 +684,10 @@ class _ImportPageState extends State<ImportPage> {
           PressableScale(
             pressedScale: 0.94,
             onTap: () {
+              // 已全选时逐个取消，否则把未选中的补上。
               for (final LocalFileEntry entry in entries) {
                 final bool on = _c.selectedPaths.contains(entry.path);
-                if (on != all) {
+                if (on == all) {
                   _c.toggleEntry(entry.path);
                 }
               }

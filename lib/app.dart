@@ -10,6 +10,7 @@ import 'core/services/app_services.dart';
 import 'core/services/backup_import_service.dart';
 import 'core/services/book_import_service.dart';
 import 'core/services/book_repository.dart';
+import 'core/services/bookmark_repository.dart';
 import 'core/services/chapter_repository.dart';
 import 'core/services/custom_font_service.dart';
 import 'core/services/excerpt_repository.dart';
@@ -18,6 +19,8 @@ import 'core/services/local_file_scanner.dart';
 import 'core/services/quote_repository.dart';
 import 'core/services/reading_preferences_repository.dart';
 import 'core/services/reading_stats_repository.dart';
+import 'core/services/reading_time_service.dart';
+import 'core/services/tag_weight_repository.dart';
 import 'core/services/update_service.dart';
 import 'core/services/user_profile_controller.dart';
 import 'core/services/wkarchive_service.dart';
@@ -64,6 +67,9 @@ class NakanoWenkuApp extends StatelessWidget {
         Provider<ExcerptRepository>.value(value: services.excerpts),
         Provider<QuoteRepository>.value(value: services.quotes),
         Provider<ReadingStatsRepository>.value(value: services.readingStats),
+        Provider<BookmarkRepository>.value(value: services.bookmarks),
+        Provider<TagWeightRepository>.value(value: services.tagWeights),
+        Provider<ReadingTimeService>.value(value: services.readingTime),
         Provider<AccountDataService>.value(value: services.accountData),
         Provider<WkArchiveService>.value(value: services.wkArchive),
         Provider<CustomFontService>.value(value: services.customFonts),

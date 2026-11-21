@@ -375,12 +375,12 @@ class AppSettingsController extends ChangeNotifier {
     final double opacityRatio = _glassOpacity.clamp(0, 100) / 100;
 
     return GlassSpec(
-      // 100 对应 28 sigma：区间拉大后，滑块从头拖到尾的视觉差异才明显。
-      blurSigma: blurRatio * 28,
-      // 液态玻璃 0~100 对应 4%~46% 底色，透明与厚实的边界都能看清。
-      liquidTintOpacity: 0.04 + opacityRatio * 0.42,
-      // 毛玻璃面板 0~100 对应 10%~90%，低值真正通透、高值真正压低。
-      panelOpacity: 0.10 + opacityRatio * 0.80,
+      // 100 对应 36 sigma：区间拉大后，滑块从头拖到尾的视觉差异才明显。
+      blurSigma: blurRatio * 36,
+      // 液态玻璃 0~100 对应 5%~50% 底色，透明与厚实的边界都能看清。
+      liquidTintOpacity: 0.05 + opacityRatio * 0.45,
+      // 毛玻璃面板 0~100 对应 12%~90%，低值真正通透、高值真正压低。
+      panelOpacity: 0.12 + opacityRatio * 0.78,
       borderWidth: _glassBorder.strokeWidth,
     );
   }

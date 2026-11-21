@@ -11,7 +11,10 @@ import '../theme/app_colors.dart';
 /// 与 [LiquidGlass] 的区别：
 /// - 液态玻璃偏「透明、反光、可点击」；
 /// - 毛玻璃偏「厚实、可读」，用于卡片、弹窗、底部导航等承载文字的容器，
-///   填充不透明度更高，保证深浅主题下的对比度。
+///   填充更实、模糊更重，保证深浅主题下的对比度。
+///
+/// 材质层次：背景模糊 → 实色底 → 顶部一道窄高光 → 底部轻微压暗 →
+/// 白边描边。比纯色块多了「一层玻璃盖在内容上」的观感，但不会抢内容。
 class FrostedGlass extends StatelessWidget {
   const FrostedGlass({
     super.key,
@@ -63,7 +66,7 @@ class FrostedGlass extends StatelessWidget {
 
     final Color borderColor = AppColors.alpha(
       Colors.white,
-      isDark ? 0.20 : 0.62,
+      isDark ? 0.24 : 0.66,
     );
 
     Widget surface = ClipRRect(
@@ -80,7 +83,7 @@ class FrostedGlass extends StatelessWidget {
           Positioned.fill(
             child: DecoratedBox(decoration: BoxDecoration(color: fill)),
           ),
-          // 极轻的顶部高光：让厚面板也有玻璃边缘，而不是纯色块。
+          // 顶部窄高光 + 底部轻微压暗：玻璃盖在内容上的厚度感。
           Positioned.fill(
             child: IgnorePointer(
               child: DecoratedBox(
@@ -89,11 +92,12 @@ class FrostedGlass extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: <Color>[
-                      AppColors.alpha(Colors.white, isDark ? 0.08 : 0.22),
+                      AppColors.alpha(Colors.white, isDark ? 0.12 : 0.34),
+                      AppColors.alpha(Colors.white, isDark ? 0.03 : 0.10),
                       Colors.transparent,
-                      AppColors.alpha(Colors.black, isDark ? 0.10 : 0.02),
+                      AppColors.alpha(Colors.black, isDark ? 0.14 : 0.03),
                     ],
-                    stops: const <double>[0.0, 0.35, 1.0],
+                    stops: const <double>[0.0, 0.08, 0.32, 1.0],
                   ),
                 ),
               ),
@@ -110,11 +114,8 @@ class FrostedGlass extends StatelessWidget {
         boxShadow: shadows
             ? <BoxShadow>[
                 BoxShadow(
-                  color: AppColors.alpha(
-                    Colors.black,
-                    isDark ? 0.45 : 0.10,
-                  ),
-                  blurRadius: 22,
+                  color: AppColors.alpha(Colors.black, isDark ? 0.45 : 0.10),
+                  blurRadius: 24,
                   spreadRadius: -8,
                   offset: const Offset(0, 10),
                 ),

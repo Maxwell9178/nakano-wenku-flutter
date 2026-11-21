@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/models/book.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/pressable_scale.dart';
 import 'book_cover_art.dart';
 
@@ -45,7 +46,7 @@ class BookCarousel extends StatefulWidget {
 
 class _BookCarouselState extends State<BookCarousel> {
   /// 单页占视口比例：约 1/3，保证单屏同时看清中间一本 + 左右各一本。
-  static const double _viewportFraction = 0.34;
+  static const double _viewportFraction = 0.28;
 
   /// 书本 X 轴固定下倾角度（需求硬性规定 13°）。
   static const double _tiltXDegree = 13;
@@ -57,18 +58,46 @@ class _BookCarouselState extends State<BookCarousel> {
 
   double _page = 0;
 
+  /// 无限循环用的偏移量：初始页放在很靠后的位置，两侧都能一直滑。
+  static const int _loopBase = 2000;
+
+  int get _count => widget.books.length;
+
+  int _bookIndexOf(int rawIndex) {
+    if (_count <= 0) {
+      return 0;
+    }
+    return ((rawIndex % _count) + _count) % _count;
+  }
+
   @override
   void initState() {
     super.initState();
     final int initial = widget.books.isEmpty
         ? 0
         : widget.initialIndex.clamp(0, widget.books.length - 1).toInt();
-    _page = initial.toDouble();
+    final int start = initial + _count * _loopBase;
+    _page = start.toDouble();
     _controller = PageController(
       viewportFraction: _viewportFraction,
-      initialPage: initial,
+      initialPage: start,
     );
     _controller.addListener(_handleScroll);
+  }
+
+  @override
+  void didUpdateWidget(covariant BookCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 书籍数量变化（导入 / 删除）后重新落到循环中段的合法位置，
+    // 避免取模后落到缺书的下标上。
+    if (oldWidget.books.length != widget.books.length &&
+        _count > 0 &&
+        _controller.hasClients) {
+      final int target =
+          widget.initialIndex.clamp(0, _count - 1).toInt() + _count * _loopBase;
+      _page = target.toDouble();
+      _controller.jumpToPage(target);
+    }
   }
 
   @override
@@ -95,8 +124,7 @@ class _BookCarouselState extends State<BookCarousel> {
 
     // 只在跨过整数本时通知外部，信息区按书籍变化淡入刷新。
     if (centerChanged) {
-      final int index = next.round().clamp(0, widget.books.length - 1).toInt();
-      widget.onCenterChanged(index);
+      widget.onCenterChanged(_bookIndexOf(next.round()));
     }
   }
 
@@ -154,7 +182,7 @@ class _BookCarouselState extends State<BookCarousel> {
               Positioned.fill(
                 child: PageView.builder(
                   controller: _controller,
-                  itemCount: widget.books.length,
+                  // itemCount 传 null = 无限循环：一本接一本绕成环。
                   itemBuilder: (BuildContext context, int index) {
                     return AnimatedBuilder(
                       animation: _controller,
@@ -183,13 +211,13 @@ class _BookCarouselState extends State<BookCarousel> {
                           ? (_controller.page ?? _page)
                           : _page;
                       final int current =
-                          (page.round() + 1).clamp(1, total).toInt();
+                          total == 0 ? 1 : _bookIndexOf(page.round()) + 1;
                       return Center(
                         child: Text(
                           '<${current.toString().padLeft(4, '0')}/'
                           '${total.toString().padLeft(4, '0')}>',
                           style: TextStyle(
-                            fontFamily: 'serif',
+                            fontFamily: AppFonts.serif,
                             fontSize: 9.5,
                             letterSpacing: 1.8,
                             color: AppColors.textTertiary(brightness),
@@ -211,7 +239,7 @@ class _BookCarouselState extends State<BookCarousel> {
     required int index,
     required double stageHeight,
   }) {
-    final Book book = widget.books[index];
+    final Book book = widget.books[_bookIndexOf(index)];
     final double page =
         _controller.hasClients ? (_controller.page ?? _page) : _page;
 
