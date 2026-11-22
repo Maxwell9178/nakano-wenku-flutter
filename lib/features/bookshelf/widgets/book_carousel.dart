@@ -45,14 +45,17 @@ class BookCarousel extends StatefulWidget {
 }
 
 class _BookCarouselState extends State<BookCarousel> {
-  /// 单页占视口比例：约 1/3，保证单屏同时看清中间一本 + 左右各一本。
-  static const double _viewportFraction = 0.28;
+  /// 单页占视口比例：单屏同时看清中间一本 + 左右各一本。
+  static const double _viewportFraction = 0.26;
 
   /// 书本 X 轴固定下倾角度（需求硬性规定 13°）。
   static const double _tiltXDegree = 13;
 
-  /// 侧边书籍最大 Y 轴旋转角，转到 52° 时以书脊 + 少量封面示人。
-  static const double _maxYawDegree = 52;
+  /// 侧边书籍最大 Y 轴旋转角。
+  ///
+  /// 之前 52° 时两侧几乎转成一条线，只剩一条窄书脊；收到 38° 后
+  /// 左右两本仍然能看清封面主体，三本一起构成一个环。
+  static const double _maxYawDegree = 38;
 
   late final PageController _controller;
 
@@ -251,23 +254,24 @@ class _BookCarouselState extends State<BookCarousel> {
     final double proximity = (1 - distance / 3).clamp(0.0, 1.0).toDouble();
     final double liftRatio = _smootherStep(proximity);
 
-    // 转正程度：正中 1，离开约 0.8 本后为 0。
+    // 转正程度：正中 1，离开约 1.2 本后才完全转侧。
+    // 窗口从 0.82 放宽到 1.2，左右相邻的封面不会被压成一条线。
     final double turn =
-        _smoothStep((1 - distance / 0.82).clamp(0.0, 1.0).toDouble());
+        _smoothStep((1 - distance / 1.2).clamp(0.0, 1.0).toDouble());
 
-    // Y 轴旋转角：随距离增加，侧边书籍最大 52°。
+    // Y 轴旋转角：随距离增加，侧边书籍最大 38°。
     final double yawRatio =
         _smoothStep((distance / 0.86).clamp(0.0, 1.0).toDouble());
     final double yaw = -offset.sign * _maxYawDegree * math.pi / 180 * yawRatio;
 
-    // 透视缩放：离中心越远整体越小，强化前后层次。
-    final double depthScale = 1 - 0.16 * (distance / 2).clamp(0.0, 1.0);
+    // 透视缩放：离中心越远整体略小，强化前后层次（幅度收窄，避免缩太小）。
+    final double depthScale = 1 - 0.12 * (distance / 2).clamp(0.0, 1.0);
 
-    // 几何尺寸：正中书籍略大；侧边书籍宽度收窄到书脊厚度。
+    // 几何尺寸：正中最大，侧边只轻微收窄，保证三本都能看到封面。
     final double coverHeight =
-        stageHeight * 0.50 * (1 + 0.12 * turn) * depthScale;
+        stageHeight * 0.46 * (1 + 0.10 * turn) * depthScale;
     final double baseWidth = coverHeight * 0.70;
-    final double coverWidth = baseWidth * (0.34 + 0.66 * turn);
+    final double coverWidth = baseWidth * (0.70 + 0.30 * turn);
 
     // 抬升高度 = 书高的 60%，并在斜上方 45° 方向偏移。
     final double lift = coverHeight * 0.60 * liftRatio;
@@ -311,7 +315,9 @@ class _BookCarouselState extends State<BookCarousel> {
                         book: book,
                         width: coverWidth,
                         height: coverHeight,
-                        sideFade: 1 - turn,
+                        // 侧边只做轻微压暗（原来 1.0 会把封面压成纯黑书脊，
+                        // 看起来就是「只剩一条窄书脊」）。
+                        sideFade: (1 - turn) * 0.30,
                       ),
                     ),
                   ),

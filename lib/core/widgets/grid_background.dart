@@ -9,7 +9,7 @@ import '../theme/app_colors.dart';
 class GridPainter extends CustomPainter {
   const GridPainter({
     required this.lineColor,
-    this.step = 46,
+    this.step = 28,
     this.strokeWidth = 1.0,
   });
 
@@ -27,17 +27,29 @@ class GridPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..isAntiAlias = false;
 
-    double x = 0;
-    while (x <= size.width) {
+    // 以画布中心为原点向两侧铺开：中心永远落着一条线，
+    // 页面左右/上下留白因此始终对称（之前从 0 开始画，右边和下边会
+    // 剩下一条不到一格的空边，看起来就是「网格偏心」）。
+    final double centerX = size.width / 2;
+    final double centerY = size.height / 2;
+    final int cols = (size.width / (2 * step)).ceil() + 1;
+    final int rows = (size.height / (2 * step)).ceil() + 1;
+
+    for (int i = -cols; i <= cols; i++) {
       // +0.5 让 1px 线落在像素中心，避免发虚。
-      canvas.drawLine(Offset(x + 0.5, 0), Offset(x + 0.5, size.height), paint);
-      x += step;
+      final double x = centerX + i * step + 0.5;
+      if (x < 0 || x > size.width) {
+        continue;
+      }
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }
 
-    double y = 0;
-    while (y <= size.height) {
-      canvas.drawLine(Offset(0, y + 0.5), Offset(size.width, y + 0.5), paint);
-      y += step;
+    for (int j = -rows; j <= rows; j++) {
+      final double y = centerY + j * step + 0.5;
+      if (y < 0 || y > size.height) {
+        continue;
+      }
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
   }
 
@@ -56,7 +68,7 @@ class GridBackground extends StatelessWidget {
   const GridBackground({
     super.key,
     required this.child,
-    this.step = 46,
+    this.step = 28,
     this.showWash = true,
   });
 

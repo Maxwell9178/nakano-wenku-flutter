@@ -25,8 +25,8 @@ class AppConstants {
   // ---------------- 版本信息 ----------------
 
   /// 需与 pubspec.yaml 的 version 保持一致。
-  static const String versionName = '1.0.1';
-  static const int versionCode = 2;
+  static const String versionName = '1.0.2';
+  static const int versionCode = 3;
 
   // ---------------- 版本更新 ----------------
 
@@ -75,6 +75,13 @@ class AppConstants {
     'https://github.com/Maxwell9178/nakano-wenku-flutter/releases/latest/download/app-release.apk',
     'https://raw.githubusercontent.com/Maxwell9178/nakano-wenku-flutter/main/dist/app-release.apk',
   ];
+
+  /// 配套更新网页（预留）。
+  ///
+  /// 后续把 Gitee 仓库的 Pages 打开、或直接把 `dist/` 托管到任意静态服务，
+  /// 只要把地址填在这里，App 就能把「版本说明 / 更新日志」整页交给网页展示，
+  /// 不需要再发版。当前留空字符串表示暂未启用。
+  static const String updateWebUrl = '';
 
   /// 冷启动自动检测的冷却天数（手动检测不受限制）。
   static const int updateCheckCooldownDays = 7;

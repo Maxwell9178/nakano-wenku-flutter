@@ -83,11 +83,16 @@ class ReaderController extends ChangeNotifier {
     return _chapters[index].title;
   }
 
-  /// 档位化进度：只出现 0% / 5% / 10% …… 100%。
+  /// 精确进度：0% / 1% / … / 100%。
+  ///
+  /// 早期版本进位到 5% 档位，一本长书读了大半屏百分比都还停在原处，
+  /// 看起来像「进度不动」；这里改成逐 1% 显示，读数与滚动位置一一对应。
   int get progressPercent {
-    final int step = (_progress.clamp(0.0, 1.0) * 20).round();
-    return (step * 5).clamp(0, 100);
+    return (_progress.clamp(0.0, 1.0) * 100).round().clamp(0, 100);
   }
+
+  /// 精确进度（0~1），续读定位与进度条共用。
+  double get progress => _progress.clamp(0.0, 1.0).toDouble();
 
   /// 供渲染用的完整背景列表（内置 + 用户上传）。
   List<ReadingBackground> get allBackgrounds => <ReadingBackground>[
@@ -173,8 +178,6 @@ class ReaderController extends ChangeNotifier {
       return;
     }
     _currentChapter = next;
-    // 换章时顺带换一条名言（只读取本地名言名句.txt，不提供手动切换入口）。
-    rotateQuote();
     notifyListeners();
     _schedulePersist();
   }
@@ -244,14 +247,10 @@ class ReaderController extends ChangeNotifier {
 
   // ---------------- 名言 ----------------
 
-  /// 沉浸模式底部长条换一条名言。
-  void rotateQuote() {
-    if (_quotes.isEmpty) {
-      return;
-    }
-    _quote = _quoteRepository.pickRandom(_quotes, previous: _quote);
-    notifyListeners();
-  }
+  /// 名言只在打开阅读页时随机取一条，之后不再变化。
+  ///
+  /// 需求：底部名言固定展示，点击无响应，不允许手动或自动切换到下一条。
+  /// 因此这里不再提供 rotateQuote，只在 [load] 里取一次。
 
   // ---------------- 读完 ----------------
 

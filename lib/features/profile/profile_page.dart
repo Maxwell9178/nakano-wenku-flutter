@@ -765,32 +765,44 @@ class _BackupAction extends StatelessWidget {
       onTap: onTap,
       child: LiquidGlass(
         borderRadius: 18,
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
-        child: Column(
-          children: <Widget>[
-            Icon(icon, size: 20, color: AppColors.textSecondary(brightness)),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 11.5,
-                letterSpacing: 0.6,
-                color: AppColors.textPrimary(brightness),
-              ),
+        // 固定高度：两张卡片文字长短不同（EXPORT .WKARCHIVE / RESTORE BACKUP），
+        // 高度由内容撑开时会出现一高一矮，这里统一成同一尺寸并整体居中。
+        child: SizedBox(
+          height: 96,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Icon(
+                  icon,
+                  size: 20,
+                  color: AppColors.textSecondary(brightness),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    letterSpacing: 0.6,
+                    color: AppColors.textPrimary(brightness),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  english,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 7.6,
+                    letterSpacing: 1.2,
+                    color: AppColors.textTertiary(brightness),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 5),
-            Text(
-              english,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 7.6,
-                letterSpacing: 1.2,
-                color: AppColors.textTertiary(brightness),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

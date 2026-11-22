@@ -6,8 +6,8 @@ import 'local_storage_service.dart';
 
 /// 阅读兴趣标签统计（雷达图数据源）。
 ///
-/// 规则（第 2 轮）：
-/// 1. 固定八个维度，书籍标签命中某维度即参与该维度计分；
+/// 规则：
+/// 1. 维度就是书架上真实存在的六个标签（文学/热血/科幻/恋爱/运动/悬疑）；
 /// 2. 计分权重 = 该书累计阅读分钟数 + 1；
 /// 3. 没有命中任何维度的书不计分；
 /// 4. 结果归一化到 0~1，供雷达图直接取用。
@@ -16,7 +16,10 @@ class TagWeightRepository {
 
   final LocalStorageService _storage;
 
-  /// 雷达图的八个维度（顺序固定，界面据此绘制轴）。
+  /// 雷达图的六个维度（顺序固定，界面据此绘制轴）。
+  ///
+  /// 直接复用导入时的预设标签，避免出现书架上根本没有的分类，
+  /// 也避免两处清单各自演化后对不上。
   static const List<String> dimensions = <String>[
     '文学',
     '热血',
@@ -24,8 +27,6 @@ class TagWeightRepository {
     '恋爱',
     '运动',
     '悬疑',
-    '奇幻',
-    '历史',
   ];
 
   /// 读取已持久化的分值（标签 → 原始分钟权重）。
@@ -75,7 +76,7 @@ class TagWeightRepository {
         if (trimmed.isEmpty) {
           continue;
         }
-        // 精确命中八维之一才计入，其它自定义标签保持沉默，避免图形失真。
+        // 精确命中维度之一才计入，其它自定义标签保持沉默，避免图形失真。
         if (!scores.containsKey(trimmed)) {
           continue;
         }

@@ -133,7 +133,6 @@ class ReadingPreferences {
     this.pageMode = ReaderPageMode.scroll,
     this.tapToTurnPage = true,
     this.longPressMenu = true,
-    this.volumeKeyTurn = false,
     this.defaultBackgroundId = '',
     this.turnAnimation = ReaderTurnAnimation.slide,
     this.backgroundDim = 0,
@@ -168,10 +167,9 @@ class ReadingPreferences {
 
   final ReaderPageMode pageMode;
 
-  /// 点击翻页、长按菜单、音量键翻页三个开关。
+  /// 点击翻页、长按菜单两个开关。
   final bool tapToTurnPage;
   final bool longPressMenu;
-  final bool volumeKeyTurn;
 
   /// 「设置 → 阅读偏好」里选的默认阅读背景。
   ///
@@ -197,7 +195,6 @@ class ReadingPreferences {
     ReaderPageMode? pageMode,
     bool? tapToTurnPage,
     bool? longPressMenu,
-    bool? volumeKeyTurn,
     String? defaultBackgroundId,
     ReaderTurnAnimation? turnAnimation,
     int? backgroundDim,
@@ -220,7 +217,6 @@ class ReadingPreferences {
       pageMode: pageMode ?? this.pageMode,
       tapToTurnPage: tapToTurnPage ?? this.tapToTurnPage,
       longPressMenu: longPressMenu ?? this.longPressMenu,
-      volumeKeyTurn: volumeKeyTurn ?? this.volumeKeyTurn,
       defaultBackgroundId: defaultBackgroundId ?? this.defaultBackgroundId,
       turnAnimation: turnAnimation ?? this.turnAnimation,
       backgroundDim: (backgroundDim ?? this.backgroundDim)
@@ -239,7 +235,6 @@ class ReadingPreferences {
         'pageMode': pageMode.name,
         'tapToTurnPage': tapToTurnPage,
         'longPressMenu': longPressMenu,
-        'volumeKeyTurn': volumeKeyTurn,
         'defaultBackgroundId': defaultBackgroundId,
         'turnAnimation': turnAnimation.name,
         'backgroundDim': backgroundDim,
@@ -286,7 +281,6 @@ class ReadingPreferences {
       pageMode: readerPageModeFromValue(json['pageMode'] as String?),
       tapToTurnPage: _asBool(json['tapToTurnPage'], defaults.tapToTurnPage),
       longPressMenu: _asBool(json['longPressMenu'], defaults.longPressMenu),
-      volumeKeyTurn: _asBool(json['volumeKeyTurn'], defaults.volumeKeyTurn),
       turnAnimation:
           readerTurnAnimationFromValue(json['turnAnimation'] as String?),
       backgroundDim: _clampInt(

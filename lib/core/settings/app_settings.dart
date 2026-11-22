@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../constants/storage_keys.dart';
@@ -126,49 +128,6 @@ ReadingFontMode readingFontModeFromStorage(String? value) {
   return ReadingFontMode.system;
 }
 
-/// 阅读水印类型（设置页第 8 项）。
-enum WatermarkType { poem, english }
-
-extension WatermarkTypeX on WatermarkType {
-  String get label {
-    switch (this) {
-      case WatermarkType.poem:
-        return '古诗';
-      case WatermarkType.english:
-        return '英文短句';
-    }
-  }
-
-  String get english {
-    switch (this) {
-      case WatermarkType.poem:
-        return 'POETRY';
-      case WatermarkType.english:
-        return 'ENGLISH';
-    }
-  }
-
-  /// 设置页预览用的示例文案。
-  String get sample {
-    switch (this) {
-      case WatermarkType.poem:
-        return '此间有书，静待人来';
-      case WatermarkType.english:
-        return 'Read slowly, live deeply.';
-    }
-  }
-}
-
-/// 从存储值还原水印类型。
-WatermarkType watermarkTypeFromStorage(String? value) {
-  for (final WatermarkType type in WatermarkType.values) {
-    if (type.name == value) {
-      return type;
-    }
-  }
-  return WatermarkType.poem;
-}
-
 /// 帧率偏好（设置页第 10 项）。
 ///
 /// 说明：Flutter 无法在纯 Dart 层强制改写屏幕刷新率，
@@ -282,8 +241,6 @@ class AppSettingsController extends ChangeNotifier {
   static const GlassBorderLevel _defaultBorder = GlassBorderLevel.thin;
   static const ReadingFontMode _defaultFontMode = ReadingFontMode.system;
   static const DecorationTone _defaultDecorationTone = DecorationTone.none;
-  static const bool _defaultWatermarkEnabled = false;
-  static const WatermarkType _defaultWatermarkType = WatermarkType.poem;
   static const FrameRateOption _defaultFrameRate = FrameRateOption.system;
   static const bool _defaultReduceMotion = false;
 
@@ -323,8 +280,6 @@ class AppSettingsController extends ChangeNotifier {
   ReadingFontMode _readingFontMode = _defaultFontMode;
   DecorationTone _decorationTone = _defaultDecorationTone;
   String? _customFontPath;
-  bool _watermarkEnabled = _defaultWatermarkEnabled;
-  WatermarkType _watermarkType = _defaultWatermarkType;
   FrameRateOption _frameRate = _defaultFrameRate;
   bool _reduceMotion = _defaultReduceMotion;
 
@@ -349,12 +304,6 @@ class AppSettingsController extends ChangeNotifier {
   /// 已导入的第三方字体文件路径（未导入时为 null）。
   String? get customFontPath => _customFontPath;
 
-  /// 阅读水印开关。
-  bool get watermarkEnabled => _watermarkEnabled;
-
-  /// 阅读水印类型。
-  WatermarkType get watermarkType => _watermarkType;
-
   /// 帧率偏好。
   FrameRateOption get frameRate => _frameRate;
 
@@ -375,15 +324,24 @@ class AppSettingsController extends ChangeNotifier {
     final double opacityRatio = _glassOpacity.clamp(0, 100) / 100;
 
     return GlassSpec(
-      // 100 对应 36 sigma：区间拉大后，滑块从头拖到尾的视觉差异才明显。
-      blurSigma: blurRatio * 36,
-      // 液态玻璃 0~100 对应 5%~50% 底色，透明与厚实的边界都能看清。
-      liquidTintOpacity: 0.05 + opacityRatio * 0.45,
-      // 毛玻璃面板 0~100 对应 12%~90%，低值真正通透、高值真正压低。
-      panelOpacity: 0.12 + opacityRatio * 0.78,
+      // 1~30 sigma：低端保留一点雾感，高端真正糊开；
+      // 用平方根曲线让滑块前半段也能看到明显变化。
+      blurSigma: 1 + 29 * _sqrtCurve(blurRatio),
+      // 液态玻璃 0~100 对应 4%~46% 底色。
+      liquidTintOpacity: 0.04 + opacityRatio * 0.42,
+      // 毛玻璃面板 0~100 对应 6%~72%：整条轴都有连续的浓淡变化，
+      // 不会在 1/3 处就变成纯色。
+      panelOpacity: 0.06 + opacityRatio * 0.66,
       borderWidth: _glassBorder.strokeWidth,
     );
   }
+
+  /// 把 0~1 的滑块位置映射成一条更「线性」的视觉曲线。
+  ///
+  /// 模糊这类参数在低值段人眼极敏感、高值段很快饱和，
+  /// 直接线性映射会让滑块前半段变化剧烈、后半段几乎没反应，
+  /// 所以这里取平方根，把差异摊平到整条轴上。
+  static double _sqrtCurve(double ratio) => math.sqrt(ratio.clamp(0.0, 1.0));
 
   // ---------------- 初始化 ----------------
 
@@ -410,13 +368,6 @@ class AppSettingsController extends ChangeNotifier {
       _storage.getString(StorageKeys.decorationTone),
     );
     AppColors.decoration = _decorationTone.color;
-    _watermarkEnabled = _storage.getBool(
-      StorageKeys.watermarkEnabled,
-      fallback: _defaultWatermarkEnabled,
-    );
-    _watermarkType = watermarkTypeFromStorage(
-      _storage.getString(StorageKeys.watermarkType),
-    );
     _frameRate = frameRateOptionFromStorage(
       _storage.getString(StorageKeys.frameRate),
     );
@@ -506,24 +457,6 @@ class AppSettingsController extends ChangeNotifier {
     await _storage.setString(StorageKeys.customFontPath, path);
   }
 
-  Future<void> setWatermarkEnabled(bool enabled) async {
-    if (_watermarkEnabled == enabled) {
-      return;
-    }
-    _watermarkEnabled = enabled;
-    notifyListeners();
-    await _storage.setBool(StorageKeys.watermarkEnabled, enabled);
-  }
-
-  Future<void> setWatermarkType(WatermarkType type) async {
-    if (_watermarkType == type) {
-      return;
-    }
-    _watermarkType = type;
-    notifyListeners();
-    await _storage.setString(StorageKeys.watermarkType, type.name);
-  }
-
   Future<void> setFrameRate(FrameRateOption option) async {
     if (_frameRate == option) {
       return;
@@ -556,8 +489,6 @@ class AppSettingsController extends ChangeNotifier {
     _readingFontMode = _defaultFontMode;
     _decorationTone = _defaultDecorationTone;
     AppColors.decoration = null;
-    _watermarkEnabled = _defaultWatermarkEnabled;
-    _watermarkType = _defaultWatermarkType;
     _frameRate = _defaultFrameRate;
     _reduceMotion = _defaultReduceMotion;
     disableMotion = _defaultReduceMotion;
@@ -579,8 +510,6 @@ class AppSettingsController extends ChangeNotifier {
       StorageKeys.decorationTone,
       _decorationTone.name,
     );
-    await _storage.setBool(StorageKeys.watermarkEnabled, _watermarkEnabled);
-    await _storage.setString(StorageKeys.watermarkType, _watermarkType.name);
     await _storage.setString(StorageKeys.frameRate, _frameRate.name);
     await _storage.setBool(StorageKeys.reduceMotion, _reduceMotion);
     // 自定义字体路径保留：删除账号时由删除流程单独清理字体文件。

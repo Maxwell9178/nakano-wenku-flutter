@@ -84,6 +84,11 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
   bool _immersive = false;
   bool _loaded = false;
   bool _positionSyncQueued = false;
+
+  /// 章节名同步的最小间隔：滚动很快时不必每帧都去量 RenderBox。
+  static const Duration _chapterSyncInterval = Duration(milliseconds: 120);
+  DateTime _lastChapterSync = DateTime.fromMillisecondsSinceEpoch(0);
+
   String? _hint;
   Timer? _hintTimer;
 
@@ -104,7 +109,6 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _scroll.addListener(_handleScroll);
-    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
   }
 
   @override
@@ -189,7 +193,6 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     _timeFlushTimer?.cancel();
     _hintTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
-    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _scroll.removeListener(_handleScroll);
     _scroll.dispose();
     _pages?.dispose();
@@ -211,30 +214,77 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     }
   }
 
+  /// 恢复上次读到的地方。
+  ///
+  /// 旧实现只跳章节开头，用户续读永远要重新往下翻。现在按整本书的滚动
+  /// 比例还原到**同一处文字**：首帧拿到 maxScrollExtent 后直接定位，
+  /// 布局还没完成（高度为 0）时再等一帧重试。
   void _restorePosition() {
     final ReaderController? controller = _controller;
     if (controller == null) {
       return;
     }
     _percent.value = controller.progressPercent;
-    if (controller.preferences.pageMode == ReaderPageMode.scroll &&
-        controller.currentChapter > 0) {
-      _jumpToChapter(controller.currentChapter, animate: false);
+    final double ratio = controller.progress.clamp(0.0, 1.0).toDouble();
+    if (ratio <= 0) {
+      return;
     }
+    if (controller.preferences.pageMode == ReaderPageMode.horizontal) {
+      _syncPageToChapter(controller.currentChapter);
+      return;
+    }
+    _restoreScrollOffset(ratio, attempts: 3);
   }
 
+  void _restoreScrollOffset(double ratio, {required int attempts}) {
+    if (!mounted) {
+      return;
+    }
+    if (!_scroll.hasClients || _scroll.position.maxScrollExtent <= 0) {
+      if (attempts > 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _restoreScrollOffset(ratio, attempts: attempts - 1);
+        });
+      }
+      return;
+    }
+    final double target = _scroll.position.maxScrollExtent * ratio;
+    _scroll.jumpTo(target);
+  }
+
+  /// 滚动时更新进度。
+  ///
+  /// 进度直接取「滚动偏移 / 可滚动总长」：
+  /// 读到最底部就是精确的 100%，不依赖章节高度的估算，
+  /// 也不会出现「读完只显示 90%」。章节名同步按 ~120ms 节流，
+  /// 不再每帧遍历所有章节的 RenderBox（那是卡顿的主要来源）。
   void _handleScroll() {
     final ReaderController? controller = _controller;
     if (controller == null || !_scroll.hasClients) {
       return;
     }
+    final ScrollPosition position = _scroll.position;
+    final double max = position.maxScrollExtent;
+    final double ratio =
+        max <= 0 ? 1.0 : (position.pixels / max).clamp(0.0, 1.0).toDouble();
 
+    controller.updateProgress(ratio);
+    final int percent = controller.progressPercent;
+    if (_percent.value != percent) {
+      _percent.value = percent;
+    }
+
+    final DateTime now = DateTime.now();
     if (_positionSyncQueued) {
+      return;
+    }
+    if (now.difference(_lastChapterSync) < _chapterSyncInterval) {
       return;
     }
     _positionSyncQueued = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _positionSyncQueued = false;
+      _lastChapterSync = DateTime.now();
       if (!mounted) {
         return;
       }
@@ -243,37 +293,61 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     });
   }
 
-  /// 当前章节在整本里的相对进度（卷内进度）。
-  ///
-  /// 只看「当前这一章已经读掉了多少」，再折算成全书位置，
-  /// 这样滚到底部时不会因为 maxScrollExtent 归零而误报 100%。
-  double _chapterRatio(int chapterIndex) {
+  /// 找出视口顶部附近的章节，只服务「顶部章节名」与章节末提示。
+  void _syncReadingPosition() {
+    final ReaderController? controller = _controller;
     final RenderBox? area = _listRenderBox();
-    if (area == null) {
-      return 0;
+    if (controller == null || area == null) {
+      return;
     }
-    final RenderBox? top = _chapterKeyBox(chapterIndex);
-    if (top == null) {
-      return 0;
+    final double probe = area.size.height * 0.28;
+    final int total = controller.chapterCount;
+    final int current = controller.currentChapter;
+
+    // 只扫当前章前后各两章：滚动时开销与全书章节数无关。
+    int candidate = current;
+    for (int i = math.max(0, current - 2);
+        i < math.min(total, current + 3);
+        i++) {
+      final double? top = _chapterTop(i, area);
+      if (top == null) {
+        continue;
+      }
+      if (top <= probe) {
+        candidate = i;
+      }
     }
-    final double viewport = area.size.height;
-    final double probe = viewport * 0.28;
-    final double topY = top.localToGlobal(Offset.zero, ancestor: area).dy;
-    final RenderBox? nextBox = _chapterKeyBox(chapterIndex + 1);
-    final double bottomY = nextBox == null
-        ? topY + top.size.height
-        : nextBox.localToGlobal(Offset.zero, ancestor: area).dy;
-    final double length = (bottomY - topY).clamp(1.0, double.infinity);
-    return ((probe - topY) / length).clamp(0.0, 1.0).toDouble();
+    if (candidate != controller.currentChapter) {
+      controller.setCurrentChapter(candidate);
+    }
   }
 
-  RenderBox? _chapterKeyBox(int index) {
-    if (index < 0 || index >= _chapterKeys.length) {
-      return null;
+  void _detectChapterEnding() {
+    final ReaderController? controller = _controller;
+    final RenderBox? area = _listRenderBox();
+    if (controller == null || area == null) {
+      return;
     }
-    final BuildContext? context = _chapterKeys[index].currentContext;
-    final RenderObject? object = context?.findRenderObject();
-    return object is RenderBox ? object : null;
+    final double bottomLimit = area.size.height - 34;
+    // 同样只看当前章与下一章，避免每帧遍历全部章节。
+    final int total = controller.chapterCount;
+    for (int i = controller.currentChapter;
+        i < math.min(total, controller.currentChapter + 2);
+        i++) {
+      if (_reportedEndings.contains(i)) {
+        continue;
+      }
+      final double? bottom = _chapterEndBottom(i, area);
+      if (bottom == null) {
+        continue;
+      }
+      if (bottom <= bottomLimit) {
+        _reportedEndings.add(i);
+        if (i == controller.currentChapter) {
+          _showHint('本章节已读完了哦！');
+        }
+      }
+    }
   }
 
   RenderBox? _listRenderBox() {
@@ -314,65 +388,6 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     }
     final Offset top = object.localToGlobal(Offset.zero, ancestor: area);
     return top.dy + object.size.height;
-  }
-
-  void _syncReadingPosition() {
-    final ReaderController? controller = _controller;
-    final RenderBox? area = _listRenderBox();
-    if (controller == null || area == null) {
-      return;
-    }
-    final double probe = area.size.height * 0.28;
-    int candidate = controller.currentChapter;
-    for (int i = 0; i < _chapterKeys.length; i++) {
-      final double? top = _chapterTop(i, area);
-      if (top == null) {
-        continue;
-      }
-      if (top <= probe) {
-        candidate = i;
-      }
-    }
-    if (candidate != controller.currentChapter) {
-      controller.setCurrentChapter(candidate);
-    }
-
-    // 进度按「卷内位置」折算：本卷已读的章节 + 当前章读掉的比例。
-    final int total = controller.chapterCount;
-    if (total > 0) {
-      final double ratio = ((candidate + _chapterRatio(candidate)) / total)
-          .clamp(0.0, 1.0)
-          .toDouble();
-      controller.updateProgress(ratio);
-      final int percent = controller.progressPercent;
-      if (_percent.value != percent) {
-        _percent.value = percent;
-      }
-    }
-  }
-
-  void _detectChapterEnding() {
-    final ReaderController? controller = _controller;
-    final RenderBox? area = _listRenderBox();
-    if (controller == null || area == null) {
-      return;
-    }
-    final double bottomLimit = area.size.height - 34;
-    for (int i = 0; i < _chapterEndKeys.length; i++) {
-      if (_reportedEndings.contains(i)) {
-        continue;
-      }
-      final double? bottom = _chapterEndBottom(i, area);
-      if (bottom == null) {
-        continue;
-      }
-      if (bottom <= bottomLimit) {
-        _reportedEndings.add(i);
-        if (i == controller.currentChapter) {
-          _showHint('本章节已读完了哦！');
-        }
-      }
-    }
   }
 
   // ---------------------------------------------------------------- 章节跳转
@@ -606,22 +621,6 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     if (index == _slices.length - 1) {
       _showHint('本章节已读完了哦！');
     }
-  }
-
-  bool _handleKeyEvent(KeyEvent event) {
-    final ReadingPreferences? prefs = _controller?.preferences;
-    if (prefs == null || !prefs.volumeKeyTurn || event is! KeyDownEvent) {
-      return false;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {
-      _turnPage(forward: false);
-      return true;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.audioVolumeDown) {
-      _turnPage(forward: true);
-      return true;
-    }
-    return false;
   }
 
   void _toggleImmersive() {
@@ -907,13 +906,18 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     _showHint('书签已保存');
   }
 
-  /// 正文段落：长按选中后仅提供「复制」，保持原始需求的轻量操作。
-  Widget _buildSelectableParagraph(
+  /// 正文段落。
+  ///
+  /// 这里刻意使用普通 [Text]：上一版每段都是 [SelectableText]，
+  /// 每段都会建一套独立的文本编辑/手势/选择层，一章几十段时滚动直接掉帧，
+  /// 长按还会弹出系统放大镜 —— 这两点都不符合需求。
+  /// 现在正文只做渲染，长按菜单改由整页手势统一接管。
+  Widget _buildParagraph(
     String text,
     ReadingPreferences prefs,
     Color textColor,
   ) {
-    return SelectableText(
+    return Text(
       text,
       textAlign: TextAlign.justify,
       style: TextStyle(
@@ -924,23 +928,6 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
         // 正文跟随设置里的字体来源；大标题一律走宋体，不受这里影响。
         fontFamily: context.watch<AppSettingsController>().fontFamilyOverride,
       ),
-      contextMenuBuilder: (BuildContext context, EditableTextState state) {
-        final TextEditingValue value = state.textEditingValue;
-        final String selected = value.selection.textInside(value.text).trim();
-        return AdaptiveTextSelectionToolbar.buttonItems(
-          anchors: state.contextMenuAnchors,
-          buttonItems: <ContextMenuButtonItem>[
-            ContextMenuButtonItem(
-              label: '复制',
-              onPressed: () {
-                ContextMenuController.removeAny();
-                Clipboard.setData(ClipboardData(text: selected));
-                state.hideToolbar();
-              },
-            ),
-          ],
-        );
-      },
     );
   }
 
@@ -1142,7 +1129,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
         ),
         const SizedBox(height: 18),
         for (int i = 0; i < paragraphs.length; i++) ...<Widget>[
-          _buildSelectableParagraph(paragraphs[i], prefs, textColor),
+          _buildParagraph(paragraphs[i], prefs, textColor),
           if (i != paragraphs.length - 1)
             SizedBox(height: prefs.paragraphSpacing),
         ],
@@ -1317,45 +1304,43 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
         prefs.rightMargin,
         prefs.bottomMargin,
       ),
-      child: SingleChildScrollView(
-        physics: const ClampingScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            if (slice.isChapterStart) ...<Widget>[
-              Text(
-                'CHAPTER ${(slice.chapterIndex + 1).toString().padLeft(2, '0')}',
-                style: TextStyle(
-                  fontSize: 8.6,
-                  letterSpacing: 2.4,
-                  color: AppColors.alpha(subColor, 0.72),
-                ),
+      // 分页模式不再套滚动视图：切页只按左右翻，页面内不允许上下滑动。
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          if (slice.isChapterStart) ...<Widget>[
+            Text(
+              'CHAPTER ${(slice.chapterIndex + 1).toString().padLeft(2, '0')}',
+              style: TextStyle(
+                fontSize: 8.6,
+                letterSpacing: 2.4,
+                color: AppColors.alpha(subColor, 0.72),
               ),
-              const SizedBox(height: 7),
-              Text(
-                heading,
-                style: TextStyle(
-                  fontFamily: AppFonts.serif,
-                  fontSize: 16.5,
-                  height: 1.4,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.8,
-                  color: textColor,
-                ),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              heading,
+              style: TextStyle(
+                fontFamily: AppFonts.serif,
+                fontSize: 16.5,
+                height: 1.4,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.8,
+                color: textColor,
               ),
-              const SizedBox(height: 10),
-              ThinDivider(
-                width: 26,
-                thickness: 1.1,
-                color: AppColors.alpha(textColor, 0.32),
-              ),
-              const SizedBox(height: 16),
-            ],
-            _buildSelectableParagraph(slice.text, prefs, textColor),
-            if (slice.isLastOfBook)
-              _buildFinishBlock(controller, textColor, subColor),
+            ),
+            const SizedBox(height: 10),
+            ThinDivider(
+              width: 26,
+              thickness: 1.1,
+              color: AppColors.alpha(textColor, 0.32),
+            ),
+            const SizedBox(height: 16),
           ],
-        ),
+          _buildParagraph(slice.text, prefs, textColor),
+          if (slice.isLastOfBook)
+            _buildFinishBlock(controller, textColor, subColor),
+        ],
       ),
     );
   }
@@ -1374,8 +1359,6 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     return AnimatedBuilder(
       animation: controller,
       builder: (BuildContext context, Widget? child) {
-        final AppSettingsController settings =
-            context.watch<AppSettingsController>();
         if (!controller.hasChapters) {
           return _buildEmpty(controller);
         }
@@ -1416,18 +1399,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
-                    // 阅读水印：设置页开关打开后才出现，默认关闭，保持整页干净。
-                    if (settings.watermarkEnabled)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: _ReaderWatermark(
-                            text: settings.watermarkType.sample,
-                            color: ReaderBackgroundView.textColor(
-                              controller.backgroundId,
-                            ),
-                          ),
-                        ),
-                      ),
+                    // 阅读水印已整体移除：阅读页只保留正文文字。
                     if (!_immersive)
                       Positioned(
                         left: 0,
@@ -1754,49 +1726,6 @@ class _CatalogRow extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// 阅读页水印层：极低透明度、轻微倾斜，仅在设置页开启「阅读水印」后渲染。
-///
-/// 文案取自 [WatermarkType] 的示例文本（古诗 / 英文短句），
-/// 位置平铺在正文之上但不拦截任何手势。
-class _ReaderWatermark extends StatelessWidget {
-  const _ReaderWatermark({required this.text, required this.color});
-
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    if (text.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        final int columns = (constraints.maxHeight / 150).ceil().clamp(3, 8);
-        return Transform.rotate(
-          angle: -0.16,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: List<Widget>.generate(
-              columns,
-              (int index) => Text(
-                text,
-                maxLines: 1,
-                overflow: TextOverflow.clip,
-                style: TextStyle(
-                  fontSize: 26,
-                  letterSpacing: 6,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.alpha(color, 0.055),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }

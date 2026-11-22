@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -155,8 +157,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SizedBox(height: 30),
                     _buildReadingPreferenceCard(brightness, accent),
                     const SizedBox(height: 30),
-                    _buildWatermarkCard(brightness, settings, accent),
-                    const SizedBox(height: 30),
                     _buildLibraryCard(brightness, accent),
                     const SizedBox(height: 30),
                     _buildPerformanceCard(brightness, settings, accent),
@@ -297,70 +297,136 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   /// 2、3、4 项共用的小预览框：实时反映模糊 / 透明度 / 边框。
+  ///
+  /// 预览框内部有一层真实的 [BackdropFilter]，所以拖动「模糊」滑块时
+  /// 框内图案会跟着从清晰变到糊成一片；「透明度」滑块控制框内填充色的浓淡，
+  /// 整条滑动区间都有连续变化，不会再出现前 1/3 之后没反应的情况。
   Widget _buildGlassPreview(
     Brightness brightness,
     AppSettingsController settings,
     Color accent,
   ) {
     final GlassSpec spec = settings.glassSpec;
+    final Color panelBase =
+        brightness == Brightness.dark ? Colors.black : Colors.white;
+    final double sigma = spec.blurSigma;
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        height: 92,
+        height: 104,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: <Color>[
-              AppColors.alpha(accent, 0.16),
-              AppColors.alpha(accent, 0.03),
+              AppColors.alpha(
+                  accent, brightness == Brightness.dark ? 0.30 : 0.22),
+              AppColors.alpha(accent, 0.04),
             ],
           ),
         ),
         child: Stack(
           fit: StackFit.expand,
           children: <Widget>[
-            Center(
+            // 背景装饰：三条粗细不一的色块 + 一排小圆点。
+            // 它们的作用是给模糊程度提供参照物，模糊越大越看不清。
+            Positioned(
+              left: 16,
+              top: 14,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 10,
-                ),
+                width: 54,
+                height: 30,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.alpha(accent, 0.75),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 18,
+              top: 22,
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
                   color: AppColors.alpha(
-                    brightness == Brightness.dark ? Colors.black : Colors.white,
-                    spec.panelOpacity,
-                  ),
-                  border: Border.all(
-                    width: spec.borderWidth,
-                    color: AppColors.alpha(accent, 0.55),
+                    brightness == Brightness.dark ? Colors.white : Colors.black,
+                    0.55,
                   ),
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Text(
-                      '毛玻璃预览',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.6,
-                        color: AppColors.textPrimary(brightness),
+              ),
+            ),
+            Positioned(
+              left: 22,
+              bottom: 16,
+              child: Row(
+                children: <Widget>[
+                  for (int i = 0; i < 5; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.alpha(accent, 0.9 - i * 0.15),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'GLASS PREVIEW · ${settings.glassBlur}/${settings.glassOpacity}',
-                      style: AppTypography.englishLabel(
-                        brightness,
-                        fontSize: 8.2,
-                        letterSpacing: 1.8,
-                        color: AppColors.textTertiary(brightness),
+                ],
+              ),
+            ),
+            // 玻璃本体：真实的背景模糊 + 填充色 + 描边。
+            Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: BackdropFilter(
+                  filter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 22,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: AppColors.alpha(panelBase, spec.panelOpacity),
+                      border: Border.all(
+                        width: spec.borderWidth,
+                        color: AppColors.alpha(
+                          brightness == Brightness.dark
+                              ? Colors.white
+                              : Colors.black,
+                          brightness == Brightness.dark ? 0.55 : 0.35,
+                        ),
                       ),
                     ),
-                  ],
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          '毛玻璃预览',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.6,
+                            color: AppColors.textPrimary(brightness),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'BLUR ${settings.glassBlur} · OPACITY ${settings.glassOpacity}',
+                          style: AppTypography.englishLabel(
+                            brightness,
+                            fontSize: 8.2,
+                            letterSpacing: 1.6,
+                            color: AppColors.textTertiary(brightness),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -659,105 +725,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   fontSize: 11,
                   height: 1.6,
                   color: AppColors.textTertiary(brightness),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ---------------- 阅读水印 ----------------
-
-  Widget _buildWatermarkCard(
-    Brightness brightness,
-    AppSettingsController settings,
-    Color accent,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        const SectionHeader(title: '阅读水印', english: 'WATERMARK'),
-        const SizedBox(height: 14),
-        LiquidGlass(
-          borderRadius: 24,
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: _SettingLabel(
-                      title: '开启水印',
-                      english: 'ENABLED',
-                      brightness: brightness,
-                    ),
-                  ),
-                  _GlassSwitch(
-                    value: settings.watermarkEnabled,
-                    accent: accent,
-                    onChanged: settings.setWatermarkEnabled,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              AnimatedOpacity(
-                duration: const Duration(milliseconds: 220),
-                opacity: settings.watermarkEnabled ? 1 : 0.45,
-                child: IgnorePointer(
-                  ignoring: !settings.watermarkEnabled,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      _SettingLabel(
-                        title: '水印类型',
-                        english: 'STYLE',
-                        brightness: brightness,
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: <Widget>[
-                          for (final WatermarkType type in WatermarkType.values)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: _ChoiceChip(
-                                label: '${type.label} · ${type.english}',
-                                selected: settings.watermarkType == type,
-                                onTap: () => settings.setWatermarkType(type),
-                                accent: accent,
-                                brightness: brightness,
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          color: AppColors.alpha(
-                            accent,
-                            brightness == Brightness.dark ? 0.08 : 0.05,
-                          ),
-                        ),
-                        child: Text(
-                          settings.watermarkType.sample,
-                          style: TextStyle(
-                            fontSize: 12,
-                            height: 1.6,
-                            letterSpacing: 0.8,
-                            color: AppColors.textSecondary(brightness),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ],

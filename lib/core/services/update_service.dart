@@ -74,6 +74,15 @@ class UpdateService {
   /// 重试时使用更短的超时，避免用户长时间等待。
   static const Duration _retryTimeout = Duration(seconds: 5);
 
+  /// 多路并行检测的整体等待上限。
+  ///
+  /// 超过这个时间就先把已经拿到的结果返回，剩下的源不再等，
+  /// 避免弱网下「转圈十几秒最后报连不上」。
+  static const Duration _raceTimeout = Duration(seconds: 9);
+
+  /// 最近一次检测失败的说明（供设置页/版本页展示，纯本地记录）。
+  String? lastError;
+
   /// 自动检测冷却：7 天。
   static const Duration _cooldown =
       Duration(days: AppConstants.updateCheckCooldownDays);
@@ -118,80 +127,133 @@ class UpdateService {
         StorageKeys.updateSkippedVersionCode, _dismissKey(info));
   }
 
-  /// 检测更新：Gitee 优先，失败后切换 GitHub，两个都失败返回 [UpdateStatus.failed]。
+  /// 检测更新。
+  ///
+  /// 多路源改成「同时发起、谁先给出更高版本就用谁」：
+  /// 以前是一路一路串行试，任何一路卡住（例如 Gitee 在弱网下握手慢）
+  /// 用户就要干等十几秒，看起来就像「连不上服务器」。现在四路清单
+  /// 并行请求，整体最多等 [_raceTimeout]，拿到结果立刻返回。
   ///
   /// 只有检测成功才写入冷却时间，离线时下次冷启动仍会重试。
   Future<UpdateCheckResult> check() async {
+    lastError = null;
     final List<_UpdateSource> sources = <_UpdateSource>[
       _UpdateSource(
         label: 'Gitee raw',
         uri: _manifestUri,
         parser: AppVersionInfo.fromManifest,
       ),
-      // Pages 未开通时这里会快速 404，随后自动落到下一路源。
+      // Pages 未开通时这里会快速 404，并行请求不会拖慢其它源。
       _UpdateSource(
         label: 'Gitee Pages',
         uri: Uri.parse(AppConstants.updateRawManifestUrl),
         parser: AppVersionInfo.fromManifest,
       ),
-      // GitHub 仓库 raw：只要把 version.json 推到 main 分支就能读到，
-      // 不需要开 Pages、也不需要发 Release，是最稳的一路。
+      // GitHub 仓库 raw：把 version.json 推到 main 分支就能读到。
       _UpdateSource(
         label: 'GitHub raw',
         uri: Uri.parse(AppConstants.updateGithubRawManifestUrl),
         parser: AppVersionInfo.fromManifest,
       ),
-      // jsDelivr 是国内可直连的 GitHub 静态镜像：即使 Gitee 仓库没有
-      // version.json，只要 GitHub 仓库里放了文件，这里也能读到。
+      // jsDelivr 是国内可直连的 GitHub 静态镜像。
       _UpdateSource(
         label: 'jsDelivr',
         uri: _mirrorUri,
         parser: AppVersionInfo.fromManifest,
       ),
-      _UpdateSource(
-        label: 'GitHub',
-        uri: _apiUri,
-        parser: AppVersionInfo.fromGitHubRelease,
-      ),
     ];
 
-    String? lastError;
-    for (final _UpdateSource source in sources) {
-      try {
-        final String raw = await _fetchWithRetry(source.uri);
-        final Object? decoded = jsonDecode(raw);
-        if (decoded is! Map<String, dynamic>) {
-          throw const FormatException('返回内容不是 JSON 对象');
-        }
-        final AppVersionInfo? info = source.parser(decoded);
-        if (info == null) {
-          throw const FormatException('版本字段缺失');
-        }
+    final List<UpdateCheckResult?> results = await Future.wait(
+      sources.map(_trySource),
+    ).timeout(
+      _raceTimeout,
+      onTimeout: () => const <UpdateCheckResult?>[],
+    );
 
+    final UpdateCheckResult? best = _pickBest(results);
+    if (best != null) {
+      await _storage.setInt(
+        StorageKeys.lastAutoUpdateCheckAt,
+        DateTime.now().millisecondsSinceEpoch,
+      );
+      return best;
+    }
+
+    // 清单全挂时再试一次 Releases API（有些用户只在 GitHub 发版不传清单）。
+    try {
+      final UpdateCheckResult? fallback = await _trySource(
+        _UpdateSource(
+          label: 'GitHub',
+          uri: _apiUri,
+          parser: AppVersionInfo.fromGitHubRelease,
+        ),
+      );
+      if (fallback != null) {
         await _storage.setInt(
           StorageKeys.lastAutoUpdateCheckAt,
           DateTime.now().millisecondsSinceEpoch,
         );
-
-        final bool newer = info.isNewerThan(
-          localName: AppConstants.versionName,
-          localCode: AppConstants.versionCode,
-        );
-        return UpdateCheckResult(
-          status: newer ? UpdateStatus.available : UpdateStatus.upToDate,
-          info: info,
-          sourceLabel: source.label,
-        );
-      } on Object catch (error) {
-        lastError = '${source.label}: ${_describeError(error)}';
-        debugPrint('[NakanoWenku][update] $lastError');
+        return fallback;
       }
+    } on Object catch (error) {
+      lastError = 'GitHub: ${_describeError(error)}';
+      debugPrint('[NakanoWenku][update] $lastError');
     }
 
     return UpdateCheckResult(
       status: UpdateStatus.failed,
       message: lastError ?? '网络不可用',
     );
+  }
+
+  /// 请求单路源；失败返回 null 并把原因记到 [lastError]。
+  Future<UpdateCheckResult?> _trySource(_UpdateSource source) async {
+    try {
+      final String raw = await _fetchWithRetry(source.uri);
+      final Object? decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException('返回内容不是 JSON 对象');
+      }
+      final AppVersionInfo? info = source.parser(decoded);
+      if (info == null) {
+        throw const FormatException('版本字段缺失');
+      }
+      final bool newer = info.isNewerThan(
+        localName: AppConstants.versionName,
+        localCode: AppConstants.versionCode,
+      );
+      return UpdateCheckResult(
+        status: newer ? UpdateStatus.available : UpdateStatus.upToDate,
+        info: info,
+        sourceLabel: source.label,
+      );
+    } on Object catch (error) {
+      lastError = '${source.label}: ${_describeError(error)}';
+      debugPrint('[NakanoWenku][update] $lastError');
+      return null;
+    }
+  }
+
+  /// 多路结果里挑「最值得告诉用户」的那一个：
+  /// 有新版本优先，其次按版本号取最大，都没有就返回第一个可用结果。
+  static UpdateCheckResult? _pickBest(List<UpdateCheckResult?> results) {
+    UpdateCheckResult? available;
+    UpdateCheckResult? upToDate;
+    for (final UpdateCheckResult? item in results) {
+      if (item == null) {
+        continue;
+      }
+      if (item.status == UpdateStatus.available) {
+        if (available == null ||
+            (item.info?.versionCode ?? 0) >
+                (available.info?.versionCode ?? 0)) {
+          available = item;
+        }
+      } else {
+        upToDate ??= item;
+      }
+    }
+    return available ?? upToDate;
   }
 
   /// 带一次重试的请求：超时、连接中断、5xx 都值得再试一次，

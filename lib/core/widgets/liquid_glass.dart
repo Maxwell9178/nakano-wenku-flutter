@@ -115,42 +115,14 @@ class LiquidGlass extends StatelessWidget {
             ),
           ),
 
-          // 3. 折射高光：左上角的镜面光团 + 斜向光带
+          // 3. 液态反光：模糊的弧形高光带 + 光团，模拟液体表面的张力与折射
           if (sheen)
             Positioned.fill(
               child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: const Alignment(-0.72, -0.92),
-                      radius: 1.05,
-                      colors: <Color>[
-                        AppColors.alpha(Colors.white, isDark ? 0.20 : 0.55),
-                        AppColors.alpha(Colors.white, isDark ? 0.05 : 0.16),
-                        Colors.transparent,
-                      ],
-                      stops: const <double>[0.0, 0.34, 1.0],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          if (sheen)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: <Color>[
-                        AppColors.alpha(Colors.white, isDark ? 0.10 : 0.26),
-                        Colors.transparent,
-                        Colors.transparent,
-                        AppColors.alpha(Colors.white, isDark ? 0.04 : 0.12),
-                      ],
-                      stops: const <double>[0.0, 0.30, 0.72, 1.0],
-                    ),
+                child: CustomPaint(
+                  painter: _LiquidSheenPainter(
+                    isDark: isDark,
+                    accent: baseTint,
                   ),
                 ),
               ),
@@ -238,6 +210,95 @@ class LiquidGlass extends StatelessWidget {
   }
 }
 
+/// 液态反光层：用几段高斯模糊的水滴形高光，模拟液体在玻璃表面流动时
+/// 产生的那种「边缘亮、中间透」的折射感。
+///
+/// 纯 DecoratedBox 很难做出这种效果，所以这里直接上 Canvas：
+/// 三段不同亮度、不同模糊半径的弧形色块，再加一条斜向的细光带。
+class _LiquidSheenPainter extends CustomPainter {
+  const _LiquidSheenPainter({required this.isDark, required this.accent});
+
+  final bool isDark;
+  final Color accent;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Rect rect = Offset.zero & size;
+    canvas.save();
+    canvas.clipRect(rect);
+
+    // 1. 左上角的水滴状光团：最大最亮的一团。
+    final Paint pool = Paint()
+      ..shader = RadialGradient(
+        colors: <Color>[
+          AppColors.alpha(Colors.white, isDark ? 0.26 : 0.62),
+          AppColors.alpha(Colors.white, isDark ? 0.06 : 0.18),
+          Colors.transparent,
+        ],
+        stops: const <double>[0.0, 0.45, 1.0],
+      ).createShader(
+        Rect.fromCircle(
+          center: Offset(size.width * 0.18, size.height * 0.06),
+          radius: size.shortestSide * 0.95,
+        ),
+      );
+    canvas.drawCircle(
+      Offset(size.width * 0.18, size.height * 0.06),
+      size.shortestSide * 0.95,
+      pool,
+    );
+
+    // 2. 斜向流动光带：一条被模糊过的窄条，像液体流动的痕迹。
+    final double bandY = size.height * 0.58;
+    final Path band = Path()
+      ..moveTo(-size.width * 0.1, bandY)
+      ..quadraticBezierTo(
+        size.width * 0.45,
+        bandY - size.height * 0.30,
+        size.width * 1.1,
+        bandY - size.height * 0.06,
+      );
+    final Paint bandPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = size.height * 0.14
+      ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, size.height * 0.10)
+      ..shader = LinearGradient(
+        colors: <Color>[
+          AppColors.alpha(Colors.white, isDark ? 0.10 : 0.30),
+          AppColors.alpha(Colors.white, isDark ? 0.02 : 0.08),
+        ],
+      ).createShader(rect);
+    canvas.drawPath(band, bandPaint);
+
+    // 3. 右下角的一点冷反射：带一点装饰色调，让玻璃有「厚度」。
+    final Paint corner = Paint()
+      ..shader = RadialGradient(
+        colors: <Color>[
+          AppColors.alpha(accent, isDark ? 0.22 : 0.16),
+          Colors.transparent,
+        ],
+      ).createShader(
+        Rect.fromCircle(
+          center: Offset(size.width * 0.92, size.height * 0.94),
+          radius: size.shortestSide * 0.75,
+        ),
+      );
+    canvas.drawCircle(
+      Offset(size.width * 0.92, size.height * 0.94),
+      size.shortestSide * 0.75,
+      corner,
+    );
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _LiquidSheenPainter oldDelegate) {
+    return oldDelegate.isDark != isDark || oldDelegate.accent != accent;
+  }
+}
+
 /// 玻璃边缘：外圈用「左上亮白 → 右下灰白」的渐变描边，
 /// 内圈再补一条更细的暗边，形成真实玻璃的双线厚度。
 class _GlassEdgePainter extends CustomPainter {
@@ -259,7 +320,6 @@ class _GlassEdgePainter extends CustomPainter {
       rect.deflate(stroke / 2),
       Radius.circular((cornerRadius - stroke / 2).clamp(0.0, 999.0)),
     );
-
     // 外圈：亮 → 暗
     final Paint outerPaint = Paint()
       ..style = PaintingStyle.stroke
@@ -276,7 +336,7 @@ class _GlassEdgePainter extends CustomPainter {
       ).createShader(rect);
 
     canvas.drawRRect(
-      outer.deflate(stroke / 2),
+      outer,
       outerPaint,
     );
 

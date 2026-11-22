@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/models/app_update.dart';
@@ -48,6 +49,15 @@ class _VersionPageState extends State<VersionPage> {
       // 等首帧渲染完成再发起请求，避免页面切换与弹窗竞争。
       WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
     }
+  }
+
+  /// 打开配套更新网页（暂未启用，[AppConstants.updateWebUrl] 留空时不展示入口）。
+  Future<void> _openUpdateWeb() async {
+    final Uri? uri = Uri.tryParse(AppConstants.updateWebUrl);
+    if (uri == null) {
+      return;
+    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Future<void> _checkForUpdate() async {
@@ -287,6 +297,16 @@ class _VersionPageState extends State<VersionPage> {
                   color: AppColors.textTertiary(brightness),
                 ),
               ),
+              if (AppConstants.updateWebUrl.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 14),
+                GhostButton(
+                  label: '更新说明网页',
+                  english: 'UPDATE NOTES',
+                  icon: Icons.open_in_new_rounded,
+                  expand: true,
+                  onTap: _openUpdateWeb,
+                ),
+              ],
             ],
           ),
         ),

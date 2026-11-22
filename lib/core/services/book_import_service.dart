@@ -2,7 +2,6 @@ import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 
-import '../constants/app_constants.dart';
 import '../models/book.dart';
 import '../models/chapter.dart';
 import 'book_parser.dart';
@@ -182,7 +181,6 @@ class BookImportService {
     }
 
     final List<Book> existing = _books.loadAll();
-    int nextNumber = _books.nextNumber(existing);
 
     final List<List<ImportedVolume>> groups = _buildGroups(
       plan.volumes,
@@ -195,13 +193,11 @@ class BookImportService {
     final List<Book> created = <Book>[];
 
     for (final List<ImportedVolume> group in groups) {
-      final bool isMerged = group.length > 1;
-      final bool volumeNaming = groups.length > 1 && !isMerged;
-
-      final int number = nextNumber;
-      nextNumber = number >= AppConstants.bookIdMax
-          ? AppConstants.bookIdMin
-          : number + 1;
+      // 每本书都重新算一次最小空号，避免与已有编号或本批已分配的编号撞号。
+      final int number = _books.nextNumber(<Book>[
+        ...existing,
+        ...created,
+      ]);
 
       final List<Chapter> chapters = <Chapter>[];
       for (final ImportedVolume volume in group) {
@@ -213,9 +209,9 @@ class BookImportService {
         (int sum, Chapter chapter) => sum + chapter.wordCount,
       );
       final String baseTitle = _baseTitleOf(group.first.document.title);
-      final String title = volumeNaming
-          ? '$baseTitle | ${AppConstants.formatBookId(number)}'
-          : baseTitle;
+      // 编号只写进 Book.number，绝不拼进书名：书名保持作者写的原样，
+      // 编辑书名时也不会看到「| NW-0001」这类后缀。
+      final String title = baseTitle;
 
       // 同一本合并书可能对应多个源文件，进度逐个回填。
       final Set<int> sourceIndexes =

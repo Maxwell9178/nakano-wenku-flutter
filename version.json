@@ -1,7 +1,7 @@
 {
-  "versionName": "1.0.1",
-  "versionCode": 2,
-  "changelog": "1.0.1：修复「我的」「阅读」「书签」页面灰屏与一直加载的问题；毛玻璃与液态玻璃重做；开屏标题改用宋体；导入页小球编号与全选修复；3D 书架更紧凑并支持循环滑动。",
-  "downloadUrl": "https://github.com/Maxwell9178/nakano-wenku-flutter/releases/download/1.0.1/app-release.apk",
+  "versionName": "1.0.2",
+  "versionCode": 3,
+  "changelog": "1.0.2：阅读页去除黄线、水印、音量键翻页与长按放大镜，翻页与进度计算重做，续读定位到具体位置；液态玻璃重做，模糊/透明度滑块全区间生效；数据备份卡片对齐居中；书名不再拼接 NW 编号，编号按顺序分配；3D 书架排布收紧；雷达图改为六维；网格背景细化并居中；底部名言固定随机不再点击切换；更新检测改为多源并行，弱网下不再长时间转圈。",
+  "downloadUrl": "https://github.com/Maxwell9178/nakano-wenku-flutter/releases/download/1.0.2/app-release.apk",
   "preRelease": false
 }

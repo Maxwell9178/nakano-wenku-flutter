@@ -611,13 +611,6 @@ class _ReaderSettingsSheetState extends State<ReaderSettingsSheet> {
           onChanged: (bool value) =>
               _update(_prefs.copyWith(longPressMenu: value)),
         ),
-        _SwitchRow(
-          title: '音量键翻页',
-          description: '音量加减键分别对应上一页 / 下一页',
-          value: _prefs.volumeKeyTurn,
-          onChanged: (bool value) =>
-              _update(_prefs.copyWith(volumeKeyTurn: value)),
-        ),
         const SizedBox(height: 10),
         Text(
           '排版与操作会保存为阅读偏好，对所有书籍生效；背景图只影响当前这本书。',

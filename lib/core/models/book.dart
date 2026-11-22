@@ -195,7 +195,7 @@ class Book {
 
     return Book(
       number: _asInt(json['number'], AppConstants.bookIdMin),
-      title: _asString(json['title'], '未命名书籍'),
+      title: _cleanTitle(_asString(json['title'], '未命名书籍')),
       author: _asString(json['author'], '佚名'),
       coverPath: _asNullableString(json['coverPath']),
       wordCount: _asInt(json['wordCount'], 0),
@@ -216,6 +216,16 @@ class Book {
   }
 
   // ---------------- 反序列化辅助 ----------------
+
+  /// 编号只作为独立字段存在，绝不拼进书名。
+  ///
+  /// 旧版本导入多卷时曾把「书名 | NW-0001」写进 title，
+  /// 这里在读取时把后缀剥掉，保证界面与编辑框里只看到真正的书名。
+  static String _cleanTitle(String title) {
+    final String cleaned =
+        title.replaceFirst(RegExp(r'\s*[|｜]\s*NW-\d{1,4}\s*$'), '').trim();
+    return cleaned.isEmpty ? title : cleaned;
+  }
 
   static int _asInt(dynamic value, int fallback) {
     if (value is int) {

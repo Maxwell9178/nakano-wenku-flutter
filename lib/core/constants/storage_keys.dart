@@ -40,12 +40,6 @@ class StorageKeys {
   /// 已导入的第三方字体文件路径（绝对路径，位于应用私有目录）。
   static const String customFontPath = 'nw.settings.customFontPath';
 
-  /// 阅读水印开关。
-  static const String watermarkEnabled = 'nw.settings.watermarkEnabled';
-
-  /// 阅读水印类型：poem / english。
-  static const String watermarkType = 'nw.settings.watermarkType';
-
   /// 装饰配色（第 3 轮）。
   static const String decorationTone = 'nw.settings.decorationTone';
 

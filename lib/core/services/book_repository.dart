@@ -53,24 +53,13 @@ class BookRepository {
 
   /// 分配下一个可用编号（0001 → 9999）。
   ///
-  /// 优先取「最大编号 + 1」，这样删除中间某本后新书不会回填旧号；
-  /// 但最大编号已经顶到 9999 时就改为找当前最小空闲号，
-  /// 避免 `clamp` 之后永远返回 9999 从而覆盖已有书籍。
+  /// 规则：从 0001 开始找**最小的空号**。
+  /// 之前用「最大号 + 1」，删掉中间的书以后新书会越爬越高（几十本书也会
+  /// 跳到 0800+），这里改成补空位，序号始终紧凑、连续。
   int nextNumber(List<Book> books) {
     final Set<int> used = <int>{
       for (final Book book in books) book.number,
     };
-    int max = 0;
-    for (final int number in used) {
-      if (number > max) {
-        max = number;
-      }
-    }
-    if (max < AppConstants.bookIdMax) {
-      return (max + 1)
-          .clamp(AppConstants.bookIdMin, AppConstants.bookIdMax)
-          .toInt();
-    }
     for (int candidate = AppConstants.bookIdMin;
         candidate <= AppConstants.bookIdMax;
         candidate++) {
