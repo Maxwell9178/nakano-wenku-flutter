@@ -96,6 +96,14 @@ android {
         }
     }
 
+    // AGP 内置的 JavaDoc lint 解析器在部分 JDK 上会抛 NoSuchMethodError
+    // （JavaDocParser.parseDataItem），与业务代码无关。这里关掉 release 的
+    // lint 检查，避免一条工具链 bug 阻断打包。
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
+
     packagingOptions {
         resources {
             excludes += ["META-INF/*.kotlin_module", "META-INF/LICENSE*", "META-INF/NOTICE*"]

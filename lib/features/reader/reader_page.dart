@@ -85,6 +85,9 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
   bool _loaded = false;
   bool _positionSyncQueued = false;
 
+  /// 是否由「目录 / 章节列表」明确指定章节进入：这类进入只停在章首。
+  bool _explicitEntry = false;
+
   /// 章节名同步的最小间隔：滚动很快时不必每帧都去量 RenderBox。
   static const Duration _chapterSyncInterval = Duration(milliseconds: 120);
   DateTime _lastChapterSync = DateTime.fromMillisecondsSinceEpoch(0);
@@ -140,6 +143,10 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     _readingStats = context.read<ReadingStatsRepository>();
     _readingTime = context.read<ReadingTimeService>();
     _bookmarks = context.read<BookmarkRepository>();
+    // 从目录 / 详情页章节列表点进来的属于「明确指定章节」，
+    // 这种进入方式必须停在该章开头，绝不能再按上次进度把用户拽回去。
+    _explicitEntry = widget.chapterIndex > 0 ||
+        (widget.chapterTitle != null && widget.chapterTitle!.trim().isNotEmpty);
     _readingTime?.start(widget.book.number);
     _bootstrap();
   }
@@ -225,6 +232,19 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
       return;
     }
     _percent.value = controller.progressPercent;
+    // 明确指定章节进入：只停在该章开头。
+    if (_explicitEntry) {
+      final int chapter = widget.chapterIndex;
+      if (chapter < 0 || chapter >= controller.chapterCount) {
+        return;
+      }
+      if (controller.preferences.pageMode == ReaderPageMode.horizontal) {
+        _syncPageToChapter(chapter);
+      } else {
+        _jumpToChapter(chapter, animate: false);
+      }
+      return;
+    }
     final double ratio = controller.progress.clamp(0.0, 1.0).toDouble();
     if (ratio <= 0) {
       return;
@@ -233,23 +253,60 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
       _syncPageToChapter(controller.currentChapter);
       return;
     }
-    _restoreScrollOffset(ratio, attempts: 3);
+    _restoreByProgress(ratio, attempts: 3);
   }
 
-  void _restoreScrollOffset(double ratio, {required int attempts}) {
+  /// 按「整本书进度」还原到具体文字位置。
+  ///
+  /// 进度现在是章节加权的，所以先还原到对应章节，再按章内比例往下偏移，
+  /// 这样续读落在上次读到的同一段文字上，而不是章节开头。
+  void _restoreByProgress(double progress, {required int attempts}) {
     if (!mounted) {
+      return;
+    }
+    final ReaderController? controller = _controller;
+    if (controller == null || controller.chapterCount <= 0) {
       return;
     }
     if (!_scroll.hasClients || _scroll.position.maxScrollExtent <= 0) {
       if (attempts > 0) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _restoreScrollOffset(ratio, attempts: attempts - 1);
+          _restoreByProgress(progress, attempts: attempts - 1);
         });
       }
       return;
     }
-    final double target = _scroll.position.maxScrollExtent * ratio;
-    _scroll.jumpTo(target);
+    final int total = controller.chapterCount;
+    final double scaled = progress.clamp(0.0, 1.0).toDouble() * total;
+    final int index = scaled.floor().clamp(0, total - 1);
+    final double intra = (scaled - index).clamp(0.0, 1.0).toDouble();
+    _jumpToChapter(index, animate: false);
+    if (intra <= 0.001) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) {
+        return;
+      }
+      final RenderBox? area = _listRenderBox();
+      if (area == null) {
+        return;
+      }
+      final double? top = _chapterTop(index, area);
+      if (top == null) {
+        return;
+      }
+      final double? nextTop = index + 1 < total
+          ? _chapterTop(index + 1, area)
+          : _chapterEndBottom(index, area);
+      final double height =
+          nextTop == null ? area.size.height : math.max(1.0, nextTop - top);
+      final ScrollPosition position = _scroll.position;
+      final double target = (position.pixels + intra * height)
+          .clamp(0.0, position.maxScrollExtent)
+          .toDouble();
+      _scroll.jumpTo(target);
+    });
   }
 
   /// 滚动时更新进度。
@@ -262,16 +319,6 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     final ReaderController? controller = _controller;
     if (controller == null || !_scroll.hasClients) {
       return;
-    }
-    final ScrollPosition position = _scroll.position;
-    final double max = position.maxScrollExtent;
-    final double ratio =
-        max <= 0 ? 1.0 : (position.pixels / max).clamp(0.0, 1.0).toDouble();
-
-    controller.updateProgress(ratio);
-    final int percent = controller.progressPercent;
-    if (_percent.value != percent) {
-      _percent.value = percent;
     }
 
     final DateTime now = DateTime.now();
@@ -289,8 +336,46 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
         return;
       }
       _syncReadingPosition();
+      _updateScrollProgress();
       _detectChapterEnding();
     });
+  }
+
+  /// 按「第几章 + 章内比例」计算整本书进度。
+  ///
+  /// 以前用「滚动偏移 / 可滚动总长」，各章长短差很多时会出现
+  /// 「显示第 3 章、进度却已经 40%」这种对不上的情况；
+  /// 改成章节加权后，进度与顶部章节名永远一致，读到最后一章末尾正好 100%。
+  void _updateScrollProgress() {
+    final ReaderController? controller = _controller;
+    if (controller == null) {
+      return;
+    }
+    final int total = controller.chapterCount;
+    if (total <= 0) {
+      return;
+    }
+    final RenderBox? area = _listRenderBox();
+    double progress = controller.progress;
+    if (area != null) {
+      final int current = controller.currentChapter.clamp(0, total - 1);
+      final double? top = _chapterTop(current, area);
+      if (top != null) {
+        final double? nextTop = current + 1 < total
+            ? _chapterTop(current + 1, area)
+            : _chapterEndBottom(current, area);
+        final double height =
+            (nextTop == null) ? area.size.height : math.max(1.0, nextTop - top);
+        // 章首已经滚出视口多少（top 为负值），除以本章高度就是章内比例。
+        final double intra = (-top / height).clamp(0.0, 1.0).toDouble();
+        progress = (current + intra) / total;
+      }
+    }
+    controller.updateProgress(progress.clamp(0.0, 1.0).toDouble());
+    final int percent = controller.progressPercent;
+    if (_percent.value != percent) {
+      _percent.value = percent;
+    }
   }
 
   /// 找出视口顶部附近的章节，只服务「顶部章节名」与章节末提示。
@@ -449,86 +534,6 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 只属于「一级大章」的章节下标。
-  ///
-  /// 目录里既有「第一卷」这类大章、又有它下面的小节时，上一章/下一章
-  /// 只在这层大章之间跳；目录本身仍是完整列表。
-  List<int> _majorChapterIndices() {
-    final ReaderController? controller = _controller;
-    if (controller == null || controller.chapterCount == 0) {
-      return const <int>[];
-    }
-    final List<Chapter> chapters = controller.chapters;
-    final RegExp majorPattern = RegExp(
-      r'^\s*(第\s*[0-9０-９零一二三四五六七八九十百千两]+\s*[卷部篇集]|'
-      r'[Vv]ol(?:ume)?\.?\s*[0-9]+|[Pp]art\s*[0-9]+)',
-    );
-    final List<int> majors = <int>[];
-    for (int i = 0; i < chapters.length; i++) {
-      if (majorPattern.hasMatch(chapters[i].title)) {
-        majors.add(i);
-      }
-    }
-    if (majors.length < 2) {
-      // 没有卷/部层级，整本书就是一层，按顺序走。
-      return List<int>.generate(chapters.length, (int i) => i);
-    }
-    if (majors.first != 0) {
-      majors.insert(0, 0);
-    }
-    return majors;
-  }
-
-  void _stepChapter(int delta) {
-    final ReaderController? controller = _controller;
-    if (controller == null) {
-      return;
-    }
-    final List<int> majors = _majorChapterIndices();
-    if (majors.isEmpty) {
-      return;
-    }
-    final int current = controller.currentChapter;
-    int target;
-    if (majors.contains(current)) {
-      final int at = majors.indexOf(current);
-      final int next = at + delta;
-      if (next < 0) {
-        _showHint('已经是第一章了');
-        return;
-      }
-      if (next >= majors.length) {
-        _showHint('已经是最后一章了');
-        return;
-      }
-      target = majors[next];
-    } else {
-      // 停在大章内部的小节上：往前找最近的大章边界。
-      if (delta > 0) {
-        final int next = majors.firstWhere(
-          (int index) => index > current,
-          orElse: () => -1,
-        );
-        if (next < 0) {
-          _showHint('已经是最后一章了');
-          return;
-        }
-        target = next;
-      } else {
-        final int next = majors.lastWhere(
-          (int index) => index < current,
-          orElse: () => -1,
-        );
-        if (next < 0) {
-          _showHint('已经是第一章了');
-          return;
-        }
-        target = next;
-      }
-    }
-    _goToChapter(target);
-  }
-
   void _syncPageToChapter(int chapterIndex, {bool animate = false}) {
     final PageController? pages = _pages;
     if (pages == null || !pages.hasClients) {
@@ -546,6 +551,25 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     } else if (index != _pageIndex) {
       pages.jumpToPage(index);
     }
+    _pageIndex = index;
+    _syncPagedProgress(index);
+  }
+
+  /// 分页模式下把「第几页」翻译成整本书的进度。
+  ///
+  /// 只在 onPageChanged 里写进度会导致「章节名已经变了、百分比还在原位」，
+  /// 所以所有会改页码的入口（点击翻页、目录跳转、续读还原）都走这里。
+  void _syncPagedProgress(int index) {
+    final ReaderController? controller = _controller;
+    if (controller == null || _slices.isEmpty) {
+      return;
+    }
+    final _ReaderSlice slice = _slices[index];
+    controller.setCurrentChapter(slice.chapterIndex);
+    final double ratio =
+        _slices.length <= 1 ? 1.0 : index / (_slices.length - 1);
+    controller.updateProgress(ratio);
+    _percent.value = controller.progressPercent;
   }
 
   // ---------------------------------------------------------------- 交互动作
@@ -565,31 +589,40 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
       return;
     }
     if (controller.preferences.pageMode == ReaderPageMode.horizontal) {
-      // 淡入 / 无动画模式不走 PageView，直接切换当前页序号。
-      if (controller.preferences.turnAnimation != ReaderTurnAnimation.slide) {
+      // 淡入 / 无动画 / PageView 还没挂载时都不走 PageView，直接切页序号。
+      final bool usePageView =
+          controller.preferences.turnAnimation == ReaderTurnAnimation.slide &&
+              _pages != null &&
+              _pages!.hasClients;
+      if (!usePageView) {
         if (forward) {
-          if (_fadeIndex + 1 < _slices.length) {
-            _setFadeIndex(_fadeIndex + 1);
+          if (_pageIndex + 1 < _slices.length) {
+            _setFadeIndex(_pageIndex + 1);
           } else {
             _showHint('已经是最后一页了');
           }
-        } else if (_fadeIndex > 0) {
-          _setFadeIndex(_fadeIndex - 1);
+        } else if (_pageIndex > 0) {
+          _setFadeIndex(_pageIndex - 1);
+        } else {
+          _showHint('已经是第一页了');
         }
         return;
       }
-      final PageController? pages = _pages;
-      if (pages == null || !pages.hasClients) {
-        return;
-      }
+      final PageController pages = _pages!;
       if (forward) {
         if (_pageIndex + 1 < _slices.length) {
+          _pageIndex += 1;
+          _syncPagedProgress(_pageIndex);
           pages.nextPage(duration: _turnDuration, curve: Curves.easeOutCubic);
         } else {
           _showHint('已经是最后一页了');
         }
       } else if (_pageIndex > 0) {
+        _pageIndex -= 1;
+        _syncPagedProgress(_pageIndex);
         pages.previousPage(duration: _turnDuration, curve: Curves.easeOutCubic);
+      } else {
+        _showHint('已经是第一页了');
       }
       return;
     }
@@ -607,17 +640,14 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
 
   /// 淡入 / 无动画模式下的翻页。
   void _setFadeIndex(int index) {
-    final ReaderController? controller = _controller;
-    if (controller == null || index < 0 || index >= _slices.length) {
+    if (index < 0 || index >= _slices.length) {
       return;
     }
-    setState(() => _fadeIndex = index);
-    final _ReaderSlice slice = _slices[index];
-    controller.setCurrentChapter(slice.chapterIndex);
-    final double ratio =
-        _slices.length <= 1 ? 1.0 : index / (_slices.length - 1);
-    controller.updateProgress(ratio);
-    _percent.value = controller.progressPercent;
+    setState(() {
+      _fadeIndex = index;
+      _pageIndex = index;
+    });
+    _syncPagedProgress(index);
     if (index == _slices.length - 1) {
       _showHint('本章节已读完了哦！');
     }
@@ -925,6 +955,11 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
         height: prefs.lineHeight,
         letterSpacing: 0.2,
         color: textColor,
+        // 显式关闭下划线：正文不需要任何装饰线，
+        // 避免主题/继承样式把每行字都画上一条线。
+        decoration: TextDecoration.none,
+        decorationColor: Colors.transparent,
+        decorationStyle: TextDecorationStyle.solid,
         // 正文跟随设置里的字体来源；大标题一律走宋体，不受这里影响。
         fontFamily: context.watch<AppSettingsController>().fontFamilyOverride,
       ),
@@ -999,7 +1034,6 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     _sliceSignature = signature;
     _slices = _paginate(controller, size);
 
-    final PageController? previous = _pages;
     int initial = _slices.indexWhere(
       (_ReaderSlice slice) => slice.chapterIndex == controller.currentChapter,
     );
@@ -1007,10 +1041,23 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
       initial = 0;
     }
     _pageIndex = initial;
-    _pages = PageController(initialPage: initial);
-    if (previous != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => previous.dispose());
+    _fadeIndex = initial;
+
+    // PageController 只在第一次创建；之后重排只把当前页定位回去。
+    // 之前每次重排都新建并 dispose 旧的，切页瞬间会出现空白帧。
+    final PageController? existing = _pages;
+    if (existing == null) {
+      _pages = PageController(initialPage: initial);
+      return;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !existing.hasClients) {
+        return;
+      }
+      if (existing.page?.round() != initial) {
+        existing.jumpToPage(initial);
+      }
+    });
   }
 
   List<_ReaderSlice> _paginate(ReaderController controller, Size size) {
@@ -1271,12 +1318,8 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
       itemCount: _slices.length,
       onPageChanged: (int index) {
         _pageIndex = index;
-        final _ReaderSlice slice = _slices[index];
-        controller.setCurrentChapter(slice.chapterIndex);
-        final double ratio =
-            _slices.length <= 1 ? 1.0 : index / (_slices.length - 1);
-        controller.updateProgress(ratio);
-        _percent.value = controller.progressPercent;
+        _fadeIndex = index;
+        _syncPagedProgress(index);
         if (index == _slices.length - 1) {
           _showHint('本章节已读完了哦！');
         }
@@ -1451,8 +1494,17 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
   Widget _buildReadingSurface(ReaderController controller, Size size) {
     final bool paged =
         controller.preferences.pageMode == ReaderPageMode.horizontal;
-    final Widget content =
+    final Widget raw =
         paged ? _buildPagedBody(controller) : _buildScrollBody(controller);
+    // 兜底：正文区域内的所有文字都不带下划线，
+    // 避免任何上层样式把「每行字下面一条线」带进来。
+    final Widget content = DefaultTextStyle.merge(
+      style: const TextStyle(
+        decoration: TextDecoration.none,
+        decorationColor: Colors.transparent,
+      ),
+      child: raw,
+    );
     if (_immersive) {
       return content;
     }
@@ -1552,12 +1604,8 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
       bookLabel: '${controller.book.title} - ${controller.book.author}',
       textColor: ReaderBackgroundView.textColor(controller.backgroundId),
       onSettings: _openSettings,
-      onPrevious: () => _stepChapter(-1),
-      onNext: () => _stepChapter(1),
       onExcerpt: _openExcerpt,
       onCatalog: _openCatalog,
-      canPrevious: controller.currentChapter > 0,
-      canNext: controller.currentChapter < controller.chapterCount - 1,
     );
   }
 

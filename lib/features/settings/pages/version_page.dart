@@ -100,12 +100,22 @@ class _VersionPageState extends State<VersionPage> {
     if (service == null) {
       return;
     }
+    // 先自己把安装包下到私有目录再交给系统安装器；
+    // 失败（无网络 / 无存储 / 安装器不可用）才回落到浏览器下载页。
+    showSoftMessage(context, '正在下载安装包……');
+    final bool installed = await service.downloadAndInstall(info);
+    if (!mounted) {
+      return;
+    }
+    if (installed) {
+      return;
+    }
     final bool opened = await service.openDownload(info);
     if (!mounted) {
       return;
     }
     if (!opened) {
-      showSoftMessage(context, '无法打开下载链接，请稍后再试');
+      showSoftMessage(context, '下载失败，请检查网络或稍后再试');
     }
   }
 

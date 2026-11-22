@@ -467,7 +467,15 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           _entryDivider(brightness),
           _EntryRow(
-            icon: Icons.bookmark_border_rounded,
+            icon: Icons.bookmarks_outlined,
+            title: '书签库',
+            subtitle: '全部书籍的书签都在这里',
+            brightness: brightness,
+            onTap: _openBookmarkLibrary,
+          ),
+          _entryDivider(brightness),
+          _EntryRow(
+            icon: Icons.menu_book_outlined,
             title: '未读书籍',
             subtitle: '共 ${controller.unfinishedBooks} 本',
             brightness: brightness,
@@ -504,6 +512,14 @@ class _ProfilePageState extends State<ProfilePage> {
         builder: (BuildContext context) => BookListPage(filter: filter),
       ),
     );
+    if (mounted) {
+      _controller?.load();
+    }
+  }
+
+  /// 打开总书签库（全部书籍的书签汇总）。
+  Future<void> _openBookmarkLibrary() async {
+    await Navigator.of(context).pushNamed(AppRoutes.bookmarkLibrary);
     if (mounted) {
       _controller?.load();
     }
@@ -558,28 +574,39 @@ class _ProfilePageState extends State<ProfilePage> {
   // ---------------- 数据包 ----------------
 
   Widget _buildBackupRow(Brightness brightness) {
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: _BackupAction(
-            icon: Icons.archive_outlined,
-            title: '导出数据包',
-            english: 'EXPORT .WKARCHIVE',
-            brightness: brightness,
-            onTap: _exportArchive,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _BackupAction(
-            icon: Icons.unarchive_outlined,
-            title: '恢复数据包',
-            english: 'RESTORE BACKUP',
-            brightness: brightness,
-            onTap: _importArchive,
-          ),
-        ),
-      ],
+    // 两张卡严格等宽等高、整体居中：用 LayoutBuilder 直接把可用宽度二等分，
+    // 不依赖 Expanded 的弹性计算，避免不同机型/语言下出现宽度偏差。
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        const double gap = 12;
+        final double cardWidth = (constraints.maxWidth - gap) / 2;
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            SizedBox(
+              width: cardWidth,
+              child: _BackupAction(
+                icon: Icons.archive_outlined,
+                title: '导出数据包',
+                english: 'EXPORT ARCHIVE',
+                brightness: brightness,
+                onTap: _exportArchive,
+              ),
+            ),
+            const SizedBox(width: gap),
+            SizedBox(
+              width: cardWidth,
+              child: _BackupAction(
+                icon: Icons.unarchive_outlined,
+                title: '恢复数据包',
+                english: 'RESTORE BACKUP',
+                brightness: brightness,
+                onTap: _importArchive,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -795,8 +822,8 @@ class _BackupAction extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 7.6,
-                    letterSpacing: 1.2,
+                    fontSize: 7.2,
+                    letterSpacing: 0.8,
                     color: AppColors.textTertiary(brightness),
                   ),
                 ),

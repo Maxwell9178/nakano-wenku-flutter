@@ -1,58 +1,17 @@
 import 'dart:io';
-import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/image_picker_helper.dart';
 import '../../../core/widgets/pressable_scale.dart';
 
-/// 唤起系统图片选择器，返回本地图片路径。
+/// 唤起**系统相册**，返回本地图片路径。
 ///
-/// 全程离线：只读取本地文件，不做任何上传。
-/// 某些平台只返回字节而没有路径，这里落一份临时文件再返回路径，
-/// 保证上层可以统一按「路径」处理头像。
+/// 全程离线：只读取本地图片，不做任何上传。
 Future<String?> pickAvatarImagePath() async {
-  FilePickerResult? picked;
   try {
-    picked = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: <String>['jpg', 'jpeg', 'png', 'webp'],
-      allowMultiple: false,
-      withData: true,
-    );
-  } catch (_) {
-    return null;
-  }
-
-  if (picked == null || picked.files.isEmpty) {
-    return null;
-  }
-
-  final PlatformFile file = picked.files.first;
-  final String? path = file.path;
-  if (path != null && path.isNotEmpty) {
-    return path;
-  }
-
-  final Uint8List? bytes = file.bytes;
-  if (bytes == null || bytes.isEmpty) {
-    return null;
-  }
-
-  try {
-    final Directory dir = await getTemporaryDirectory();
-    final String ext = p.extension(file.name).isEmpty
-        ? '.png'
-        : p.extension(file.name).toLowerCase();
-    final File temp = File(
-      p.join(dir.path,
-          'picked_avatar_${DateTime.now().millisecondsSinceEpoch}$ext'),
-    );
-    await temp.writeAsBytes(bytes, flush: true);
-    return temp.path;
+    return await pickImagePath(prefix: 'picked_avatar');
   } catch (_) {
     return null;
   }

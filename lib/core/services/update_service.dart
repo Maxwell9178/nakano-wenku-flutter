@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/app_constants.dart';
@@ -336,6 +338,115 @@ class UpdateService {
       }
     }
     return false;
+  }
+
+  /// 下载安装包并直接拉起系统安装器。
+  ///
+  /// 与 [openDownload] 的区别：这里不把下载交给浏览器，而是自己把 APK 拉到
+  /// 应用私有目录，再用 [OpenFilex] 交给系统安装器。系统浏览器下载受限
+  /// （部分 ROM 直接下不动或下载后找不到文件），这条路更可靠。
+  /// 任一环节失败都返回 false，由调用方回落 [openDownload]。
+  Future<bool> downloadAndInstall(
+    AppVersionInfo info, {
+    void Function(double progress)? onProgress,
+  }) async {
+    final List<String> candidates = <String>[
+      if (info.hasDownload) info.downloadUrl,
+      if (!info.hasDownload) AppConstants.updateApkUrl,
+      ...AppConstants.updateApkFallbackUrls,
+    ];
+
+    for (final String target in candidates) {
+      if (target.isEmpty) {
+        continue;
+      }
+      final Uri? uri = Uri.tryParse(target);
+      if (uri == null) {
+        continue;
+      }
+      final String? saved = await _downloadApk(uri, info, onProgress);
+      if (saved == null) {
+        continue;
+      }
+      try {
+        final OpenResult result = await OpenFilex.open(
+          saved,
+          type: 'application/vnd.android.package-archive',
+        );
+        if (result.type == ResultType.done) {
+          return true;
+        }
+        lastError = '安装器启动失败：${result.message}';
+        debugPrint('[NakanoWenku][update] $lastError');
+      } on Object catch (error) {
+        lastError = '安装器启动失败：$error';
+        debugPrint('[NakanoWenku][update] $lastError');
+      }
+      return false;
+    }
+    return false;
+  }
+
+  /// 把 APK 下载到日志目录下的 `updates/` 里，返回本地路径。
+  Future<String?> _downloadApk(
+    Uri uri,
+    AppVersionInfo info,
+    void Function(double progress)? onProgress,
+  ) async {
+    final HttpClient client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 12);
+    try {
+      final HttpClientRequest request = await client.getUrl(uri);
+      request.headers.set(
+        HttpHeaders.userAgentHeader,
+        '${AppConstants.appName}/${AppConstants.versionName}',
+      );
+      final HttpClientResponse response = await request.close().timeout(
+            const Duration(seconds: 20),
+          );
+      if (response.statusCode != HttpStatus.ok) {
+        lastError = '下载失败：${response.statusCode}';
+        debugPrint('[NakanoWenku][update] $lastError');
+        return null;
+      }
+      final int total = response.contentLength;
+      final Directory dir = Directory(
+        '${(await getTemporaryDirectory()).path}/updates',
+      );
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      final String fileName =
+          'NakanoWenku-${info.versionName}-${info.versionCode}.apk';
+      final File file = File('${dir.path}/$fileName');
+      final IOSink sink = file.openWrite();
+      int received = 0;
+      try {
+        await for (final List<int> chunk in response) {
+          received += chunk.length;
+          sink.add(chunk);
+          if (total > 0) {
+            onProgress?.call((received / total).clamp(0.0, 1.0));
+          }
+        }
+      } finally {
+        await sink.flush();
+        await sink.close();
+      }
+      if (received <= 0) {
+        lastError = '下载失败：文件为空';
+        debugPrint('[NakanoWenku][update] $lastError');
+        return null;
+      }
+      onProgress?.call(1);
+      return file.path;
+    } on Object catch (error) {
+      lastError = '下载失败：${_describeError(error)}';
+      debugPrint('[NakanoWenku][update] $lastError');
+      return null;
+    } finally {
+      client.close(force: true);
+    }
   }
 
   Future<bool> _launch(Uri uri) async {

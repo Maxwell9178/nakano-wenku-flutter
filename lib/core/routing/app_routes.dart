@@ -25,10 +25,11 @@ class AppRoutes {
   /// 漫画阅读页（CBX / CBZ 图片包）。
   static const String comic = '/comic';
 
-  /// 书签列表页。
+  /// 书签列表页（单本书）。
   static const String bookmarks = '/bookmarks';
 
-  /// 批注列表页。
+  /// 总书签库（全部书籍的书签汇总）。
+  static const String bookmarkLibrary = '/bookmark-library';
 
   /// 导入页面（预留）。
   static const String importFiles = '/import';

@@ -4,7 +4,7 @@ publish_to: "none"
 
 # 版本号规则：versionName+versionCode。
 # 后续版本更新模块中的 version.json 需要与这里保持一致。
-version: 1.0.2+3
+version: 1.0.3+4
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -29,8 +29,15 @@ dependencies:
   # 纯 Dart 工具库：拼接文件路径。
   path: ">=1.8.0 <2.0.0"
 
-  # 系统文件选择器：选择头像、导入书籍、手动挑选备份包。
+  # 系统文件选择器：导入书籍、手动挑选备份包、字体包。
   file_picker: ">=6.1.0 <11.0.0"
+
+  # 系统相册取图：头像、书籍封面、阅读背景图都走系统相册选择器
+  # （以前用 file_picker 打开的是文件目录，不符合需求）。
+  image_picker: ">=1.0.0 <2.0.0"
+
+  # 打开下载好的安装包，拉起系统安装器（版本更新用）。
+  open_filex: ">=4.3.0 <5.0.0"
 
   # zip 解析：.wkarchive 备份包本质是 zip，仅修改了后缀。
   archive: ">=3.4.0 <4.0.0"

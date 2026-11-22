@@ -8,30 +8,23 @@ import '../../../core/widgets/thin_divider.dart';
 /// 阅读页右侧的液态玻璃侧边条。
 ///
 /// 上方竖排展示「书名-作者」，下方依次是
-/// 阅读设置 / 上一章 / 下一章 / 摘抄 / 目录 五个矢量图标按钮。
+/// 阅读设置 / 摘抄 / 目录 三个矢量图标按钮。
+/// 「上一章 / 下一章」按钮已按需求整体删除，章节切换只走目录。
 class ReaderSidebar extends StatelessWidget {
   const ReaderSidebar({
     super.key,
     required this.bookLabel,
     required this.textColor,
     required this.onSettings,
-    required this.onPrevious,
-    required this.onNext,
     required this.onExcerpt,
     required this.onCatalog,
-    this.canPrevious = true,
-    this.canNext = true,
   });
 
   final String bookLabel;
   final Color textColor;
   final VoidCallback onSettings;
-  final VoidCallback onPrevious;
-  final VoidCallback onNext;
   final VoidCallback onExcerpt;
   final VoidCallback onCatalog;
-  final bool canPrevious;
-  final bool canNext;
 
   @override
   Widget build(BuildContext context) {
@@ -71,18 +64,6 @@ class ReaderSidebar extends StatelessWidget {
             tooltip: '阅读设置',
             color: textColor,
             onTap: onSettings,
-          ),
-          _SideButton(
-            icon: Icons.keyboard_arrow_up_rounded,
-            tooltip: '上一章',
-            color: textColor,
-            onTap: canPrevious ? onPrevious : null,
-          ),
-          _SideButton(
-            icon: Icons.keyboard_arrow_down_rounded,
-            tooltip: '下一章',
-            color: textColor,
-            onTap: canNext ? onNext : null,
           ),
           _SideButton(
             icon: Icons.format_quote_rounded,

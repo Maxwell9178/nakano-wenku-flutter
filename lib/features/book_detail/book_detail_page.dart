@@ -1,4 +1,8 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:gal/gal.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
@@ -157,28 +161,33 @@ class _BookDetailPageState extends State<BookDetailPage> {
         children: <Widget>[
           PressableScale(
             pressedScale: 0.96,
-            onTap: _changeCover,
+            // 点按查看封面大图（可保存），长按更换封面。
+            onTap: _viewCover,
+            onLongPress: _changeCover,
             child: Stack(
               children: <Widget>[
                 BookCoverArt(book: book, width: 120, height: 168),
                 Positioned(
                   right: 6,
                   bottom: 6,
-                  child: Container(
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.alpha(Colors.black, 0.55),
-                      border: Border.all(
-                        color: AppColors.alpha(Colors.white, 0.35),
-                        width: 0.7,
+                  child: GestureDetector(
+                    onTap: _changeCover,
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.alpha(Colors.black, 0.55),
+                        border: Border.all(
+                          color: AppColors.alpha(Colors.white, 0.35),
+                          width: 0.7,
+                        ),
                       ),
-                    ),
-                    child: const Icon(
-                      Icons.photo_camera_outlined,
-                      size: 13,
-                      color: Colors.white,
+                      child: const Icon(
+                        Icons.photo_camera_outlined,
+                        size: 13,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -369,7 +378,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
         children: <Widget>[
           LiquidGlass(
             borderRadius: 22,
-            onTap: () => _openReader(_c.lastChapterIndex),
+            onTap: () => _openReader(_c.lastChapterIndex, resume: true),
             child: SizedBox(
               height: 56,
               child: Row(
@@ -711,6 +720,98 @@ class _BookDetailPageState extends State<BookDetailPage> {
     }
   }
 
+  /// 查看封面大图，并可保存到系统相册。
+  Future<void> _viewCover() async {
+    final Book book = _c.book;
+    final String? path = book.coverPath;
+    final File? file = (path == null || path.isEmpty) ? null : File(path);
+    if (file == null || !file.existsSync()) {
+      showSoftMessage(context, '这本书还没有封面图片');
+      return;
+    }
+    final Brightness brightness = Theme.of(context).brightness;
+    await showDialog<void>(
+      context: context,
+      barrierColor: AppColors.alpha(Colors.black, 0.72),
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Flexible(
+                child: GestureDetector(
+                  onTap: () => Navigator.of(dialogContext).pop(),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(
+                      file,
+                      fit: BoxFit.contain,
+                      errorBuilder: (BuildContext context, Object error,
+                          StackTrace? stack) {
+                        return Text(
+                          '封面图片读取失败',
+                          style: TextStyle(
+                            color: AppColors.alpha(Colors.white, 0.85),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  GhostButton(
+                    label: '保存到相册',
+                    english: 'SAVE',
+                    icon: Icons.download_rounded,
+                    onTap: () => _saveCover(file),
+                  ),
+                  const SizedBox(width: 12),
+                  GhostButton(
+                    label: '关闭',
+                    english: 'CLOSE',
+                    onTap: () => Navigator.of(dialogContext).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '点封面也可以关闭',
+                style: TextStyle(
+                  fontSize: 8.6,
+                  letterSpacing: 0.8,
+                  color: AppColors.alpha(
+                    brightness == Brightness.dark ? Colors.white : Colors.black,
+                    0.45,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _saveCover(File file) async {
+    try {
+      final Uint8List bytes = await file.readAsBytes();
+      await Gal.putImageBytes(bytes, album: 'NakanoWenku');
+      if (mounted) {
+        showSoftMessage(context, '封面已保存到相册');
+      }
+    } on Object {
+      if (mounted) {
+        showSoftMessage(context, '保存失败，请检查相册权限');
+      }
+    }
+  }
+
   Future<void> _addTag(String tag) async {
     final String? error = await _c.addTag(tag);
     if (error != null && mounted) {
@@ -815,12 +916,14 @@ class _BookDetailPageState extends State<BookDetailPage> {
     }
   }
 
-  Future<void> _openReader(int chapterIndex) async {
+  Future<void> _openReader(int chapterIndex, {bool resume = false}) async {
     if (!_c.hasChapters) {
       showSoftMessage(context, '这本书还没有可阅读的章节');
       return;
     }
-    final Book updated = await _c.markReadingPosition(chapterIndex);
+    // resume=true 表示「继续阅读」：沿用书籍保存的进度，不当作明确指定章节。
+    final Book updated =
+        resume ? _c.book : await _c.markReadingPosition(chapterIndex);
     if (!mounted) {
       return;
     }
@@ -832,12 +935,25 @@ class _BookDetailPageState extends State<BookDetailPage> {
       );
       return;
     }
+    // 传入真实的章节标题：阅读页据此判定「明确指定章节进入」，
+    // 从而直接定位到该章开头，而不是跳回上次读到的位置。
+    if (resume) {
+      await Navigator.of(context).pushNamed(
+        AppRoutes.reader,
+        arguments: ReaderArguments(book: updated),
+      );
+      return;
+    }
+    final String chapterTitle =
+        (chapterIndex >= 0 && chapterIndex < _c.chapters.length)
+            ? _c.chapters[chapterIndex].title
+            : '';
     await Navigator.of(context).pushNamed(
       AppRoutes.reader,
       arguments: ReaderArguments(
         book: updated,
         chapterIndex: chapterIndex,
-        chapterTitle: updated.lastChapterTitle,
+        chapterTitle: chapterTitle.isEmpty ? null : chapterTitle,
       ),
     );
   }

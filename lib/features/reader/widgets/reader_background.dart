@@ -63,14 +63,13 @@ class ReaderBackgroundView extends StatelessWidget {
     }
   }
 
+  /// 网格线颜色：统一走中性灰，不再带任何暖黄调，
+  /// 避免正文里看起来像「文字下面压着一条黄线」。
   static Color _gridColor(String id) {
     if (isDarkBackground(id)) {
       return const Color(0x14FFFFFF);
     }
-    if (id == ReadingBackground.paperId) {
-      return const Color(0x147A5F32);
-    }
-    return const Color(0x0F000000);
+    return const Color(0x11000000);
   }
 
   @override
@@ -93,7 +92,7 @@ class ReaderBackgroundView extends StatelessWidget {
             child: CustomPaint(
               painter: GridPainter(
                 lineColor: Color(0x1AFFFFFF),
-                step: 46,
+                step: 32,
                 strokeWidth: 0.6,
               ),
             ),
@@ -108,7 +107,7 @@ class ReaderBackgroundView extends StatelessWidget {
       child: CustomPaint(
         painter: GridPainter(
           lineColor: _gridColor(backgroundId),
-          step: 46,
+          step: 32,
           strokeWidth: 0.7,
         ),
         child: child,
