@@ -8,6 +8,8 @@
 ![Android](https://img.shields.io/badge/Android-API%2024%2B-3DDC84?logo=android&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
+**官网 / 下载页：<https://maxwell9178.github.io/nakano-wenku-flutter/>**
+
 ---
 
 ## 这是什么
