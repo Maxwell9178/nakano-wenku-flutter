@@ -835,15 +835,20 @@ html[data-theme="light"] .theme-toggle .icon-sun { display: block; }
 
 /* ---------- 响应式 ---------- */
 @media (max-width: 980px) {
-  .hero-inner { grid-template-columns: 1fr; gap: 46px; }
-  .hero-visual { order: -1; }
-  .phone { width: min(300px, 74vw); }
+  .hero-inner { grid-template-columns: 1fr; gap: 34px; }
+  .hero-visual { order: 2; }
+  .phone { width: min(268px, 66vw); }
   .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nav-links { display: none; }
 }
 
 @media (max-width: 680px) {
-  :root { --nav-h: 64px; }
+  :root { --nav-h: 64px; 
+  /* 手机上首屏优先展示标题与下载按钮 */
+  .hero { padding-top: calc(var(--nav-h) + 26px); }
+  .hero-visual { display: none; }
+  .hero-meta { margin-top: 26px; }
+}
   .hero { padding-top: calc(var(--nav-h) + 18px); min-height: auto; }
   .hero-meta { gap: 22px; margin-top: 32px; }
   .feature-grid, .download-grid, .support-grid, .stats { grid-template-columns: 1fr; }
@@ -865,3 +870,25 @@ html[data-theme="light"] .theme-toggle .icon-sun { display: block; }
   text-decoration-thickness: 1px;
 }
 .dc-alt:hover { opacity: .72; }
+
+/* ---------- iOS 安装步骤（1.0.5 起：网页版） ---------- */
+.ios-steps {
+  margin: 14px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-2);
+}
+.ios-steps li b { color: var(--text-1); font-weight: 600; }
+.modal-note {
+  margin: 14px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-3);
+}
+
+/* 弹窗宽度按视口收敛，避免小屏被裁切 */
+.modal { overflow-y: auto; }
+.modal-card { width: min(400px, calc(100vw - 40px)); }

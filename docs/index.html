@@ -8,6 +8,14 @@
 <meta name="theme-color" content="#000000" />
 <link rel="icon" href="assets/icon-192.png" />
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="NakanoWenku" />
+<meta name="apple-touch-fullscreen" content="yes" />
+<link rel="apple-touch-startup-image" href="assets/splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" />
+<link rel="apple-touch-startup-image" href="assets/splash-2048x2732.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="NakanoWenku · 属于你的离线轻小说书架" />
 <meta property="og:description" content="开源 · 离线 · 本地优先的轻小说阅读器。没有账号，没有云端，没有广告。" />
@@ -207,26 +215,26 @@
       </article>
 
       <!-- iOS -->
-      <article class="glass panel download-card is-disabled">
+      <article class="glass panel download-card">
         <div class="dc-head">
           <div class="dc-platform">
             <svg viewBox="0 0 24 24" class="icon icon-lg" aria-hidden="true"><path d="M15.6 12.6c0-2 1.6-3 1.7-3.1-.9-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.4-.4 6 1 7.9.7 1 1.5 2.1 2.6 2 1-.1 1.4-.7 2.7-.7s1.6.7 2.7.7c1.1 0 1.8-1 2.5-2 .8-1.2 1.1-2.3 1.1-2.4-.1 0-2.4-.9-2.5-2.8Z"/><path d="M13.8 5.6c.6-.7 1-1.7.9-2.6-.9 0-1.9.6-2.5 1.3-.5.6-1 1.6-.9 2.5 1 .1 2-.5 2.5-1.2Z"/></svg>
             <div>
-              <h3>iOS 版</h3>
-              <p class="dc-tag">开发中 · 暂未发布</p>
+              <h3>iPhone / iPad</h3>
+              <p class="dc-tag">网页版 · 添加到主屏幕即用</p>
             </div>
           </div>
-          <span class="dc-ver dc-ver-off">敬请期待</span>
+          <span class="dc-ver">网页版</span>
         </div>
 
         <ul class="dc-meta">
-          <li><span>文件大小</span><b>—</b></li>
-          <li><span>更新时间</span><b>—</b></li>
-          <li><span>适配系统</span><b>iOS 尚未支持</b></li>
+          <li><span>安装方式</span><b>Safari 添加到主屏幕</b></li>
+          <li><span>占用空间</span><b>约 2 MB</b></li>
+          <li><span>适配系统</span><b>iOS / iPadOS 15+</b></li>
         </ul>
 
-        <button class="btn btn-disabled btn-block" id="iosBtn" type="button">暂未提供 iOS 版</button>
-        <p class="dc-hint">作者正在学习与准备中，上线后会第一时间在这里公布。</p>
+        <button class="btn btn-primary btn-block" id="iosBtn" type="button">查看安装步骤</button>
+        <p class="dc-hint">无需 App Store、无需签名，用 Safari 添加到主屏幕后即为全屏独立窗口。</p>
       </article>
     </div>
   </section>
@@ -347,9 +355,16 @@
 <div class="modal" id="iosModal" hidden>
   <div class="modal-mask" data-close></div>
   <div class="modal-card glass" role="dialog" aria-modal="true" aria-labelledby="iosTitle">
-    <p class="eyebrow">NOT AVAILABLE</p>
-    <h3 id="iosTitle">暂不支持 iOS 版</h3>
-    <p class="modal-desc">目前只完成了 Android 版本，iOS 版本还没有开发。上线后会在本页与 GitHub 同步公布。</p>
+    <p class="eyebrow">WEB APP</p>
+    <h3 id="iosTitle">在 iPhone / iPad 上使用</h3>
+    <p class="modal-desc">iPhone / iPad 上不需要安装包：用 Safari 打开本页，把它添加到主屏幕，就能像 App 一样全屏打开。</p>
+    <ol class="ios-steps">
+      <li>用 <b>Safari</b> 打开 <b>maxwell9178.github.io</b></li>
+      <li>点底部中间的「分享」按钮</li>
+      <li>向下滑动，选择「<b>添加到主屏幕</b>」</li>
+      <li>点右上角「添加」，回桌面点开图标即可全屏使用</li>
+    </ol>
+    <p class="modal-note">微信 / QQ 内置浏览器不支持，请点右上角「在浏览器打开」，再用 Safari 操作。</p>
     <button class="btn btn-primary btn-block" data-close type="button">知道了</button>
   </div>
 </div>

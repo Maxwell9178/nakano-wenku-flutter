@@ -269,4 +269,11 @@
     window.scrollTo({ top: top, behavior: "smooth" });
     history.replaceState(null, "", id);
   });
+  // 注册 Service Worker：让「添加到主屏幕」后的页面可以离线打开
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () {});
+    });
+  }
+
 })();
