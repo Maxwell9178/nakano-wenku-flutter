@@ -12,6 +12,7 @@ import '../../../core/widgets/pressable_scale.dart';
 import '../../../core/widgets/thin_divider.dart';
 import 'glass_slider.dart';
 import 'reader_background.dart';
+import '../../../core/platform/platform_image.dart';
 
 /// 阅读设置弹窗。
 ///
@@ -926,8 +927,8 @@ class _BackgroundTile extends StatelessWidget {
                   fit: StackFit.expand,
                   children: <Widget>[
                     if (path != null && path.isNotEmpty)
-                      Image.file(
-                        File(path),
+                      PlatformImage(
+                        path: path,
                         fit: BoxFit.cover,
                         errorBuilder: (BuildContext context, Object error,
                             StackTrace? stackTrace) {

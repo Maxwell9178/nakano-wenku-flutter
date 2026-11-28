@@ -1,0 +1,10 @@
+技术说明
+ 
+项目作者：Maxwell9178（https://github.com/Maxwell9178 ）
+项目名称：NakanoWenku（https://github.com/Maxwell9178/nakano-wenku-flutter）
+开发辅助工具：DeepSeek Harness（DeepSeek-V4.1-Flash）
+开发语言：Dart
+开发框架：Flutter
+运行平台：Android（暂支持）
+项目定位：开源离线轻小说阅读器，仅用于个人学习。
+补充说明：所有代码经过作者人工审阅、修改与测试，本项目与DeepSeek官方无关。

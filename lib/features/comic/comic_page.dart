@@ -12,6 +12,7 @@ import '../../core/widgets/grid_background.dart';
 import '../../core/widgets/liquid_glass.dart';
 import '../../core/widgets/pressable_scale.dart';
 import '../../core/widgets/thin_divider.dart';
+import '../../core/platform/platform_image.dart';
 
 /// 漫画阅读页。
 ///
@@ -294,8 +295,8 @@ class _ComicPageState extends State<ComicPage> {
       child: Container(
         color: Colors.black,
         alignment: Alignment.center,
-        child: Image.file(
-          File(path),
+        child: PlatformImage(
+          path: path,
           fit: BoxFit.contain,
           errorBuilder:
               (BuildContext context, Object error, StackTrace? stack) {

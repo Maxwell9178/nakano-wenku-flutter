@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../constants/storage_keys.dart';
+import '../platform/platform_store.dart';
 import 'local_storage_service.dart';
 
 /// 第三方字体包的导入与运行时注册。
@@ -36,6 +37,15 @@ class CustomFontService {
   Future<void> restoreSavedFont() async {
     final String? path = _storage.getString(StorageKeys.customFontPath);
     if (path == null || path.isEmpty) {
+      return;
+    }
+    if (PlatformStore.isWeb) {
+      final Uint8List? bytes = await PlatformStore.readBytes(path);
+      if (bytes == null || bytes.isEmpty) {
+        await _storage.remove(StorageKeys.customFontPath);
+        return;
+      }
+      await _register(ByteData.sublistView(bytes), path);
       return;
     }
     if (!File(path).existsSync()) {
@@ -79,6 +89,18 @@ class CustomFontService {
       throw const CustomFontException('字体文件内容为空');
     }
 
+    if (PlatformStore.isWeb) {
+      final String key =
+          'fonts/custom_${DateTime.now().millisecondsSinceEpoch}.$extension';
+      final String? token = await PlatformStore.writeBytes(key, bytes);
+      if (token == null) {
+        throw const CustomFontException('字体保存失败，请重试');
+      }
+      await _register(ByteData.sublistView(bytes), token);
+      await _storage.setString(StorageKeys.customFontPath, token);
+      return token;
+    }
+
     final Directory directory = await _fontDirectory();
     final String target =
         '${directory.path}/custom_${DateTime.now().millisecondsSinceEpoch}.'
@@ -90,8 +112,28 @@ class CustomFontService {
     return target;
   }
 
+  /// 用内存里的字体字节注册字体族。
+  Future<bool> _register(ByteData data, String path) async {
+    try {
+      final FontLoader loader = FontLoader(family)
+        ..addFont(Future<ByteData>.value(data));
+      await loader.load();
+      _loadedPath = path;
+      return true;
+    } on Object {
+      return false;
+    }
+  }
+
   /// 直接加载一个已存在的字体文件（不复制、不落盘路径）。
   Future<bool> _loadFromFile(String path) async {
+    if (PlatformStore.isWeb) {
+      final Uint8List? bytes = await PlatformStore.readBytes(path);
+      if (bytes == null || bytes.isEmpty) {
+        return false;
+      }
+      return _register(ByteData.sublistView(bytes), path);
+    }
     try {
       final Uint8List bytes = await File(path).readAsBytes();
       if (bytes.isEmpty) {
@@ -114,9 +156,13 @@ class CustomFontService {
     final String? path =
         _loadedPath ?? _storage.getString(StorageKeys.customFontPath);
     if (path != null && path.isNotEmpty) {
-      final File file = File(path);
-      if (file.existsSync()) {
-        await file.delete();
+      if (PlatformStore.isWeb) {
+        await PlatformStore.deleteToken(path);
+      } else {
+        final File file = File(path);
+        if (file.existsSync()) {
+          await file.delete();
+        }
       }
     }
     _loadedPath = null;

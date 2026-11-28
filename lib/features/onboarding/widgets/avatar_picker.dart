@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_picker_helper.dart';
 import '../../../core/widgets/pressable_scale.dart';
+import '../../../core/platform/platform_image.dart';
 
 /// 唤起**系统相册**，返回本地图片路径。
 ///
@@ -107,8 +108,8 @@ class AvatarPicker extends StatelessWidget {
       return _defaultAvatar(brightness);
     }
 
-    return Image.file(
-      File(path),
+    return PlatformImage(
+      path: path,
       // key 跟随路径变化，避免图片缓存导致换头像后仍显示旧图。
       key: ValueKey<String>(path),
       fit: BoxFit.cover,

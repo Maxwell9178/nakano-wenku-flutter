@@ -21,6 +21,13 @@ class AppFonts {
   /// 导致中文标题看起来像黑体。字形缺失时再回退到系统宋体链。
   static const String serif = 'NWSerif';
 
+  /// 网页版内置无衬线（Noto Sans SC 子集）：Web 端不能依赖系统字体，
+  /// 所有中文字形必须自带，否则会渲染成方框。
+  static const String sansWeb = 'NWSansSC';
+
+  /// 网页版的全局回退链：先无衬线，再衬线。
+  static const List<String> webFallback = <String>[sansWeb, serif];
+
   /// 中文宋体回退链，覆盖内置字缺失字形与第三方 ROM 差异。
   static const List<String> serifFallback = <String>[
     'Noto Serif CJK SC',
@@ -244,6 +251,41 @@ class AppTypography {
     return style.copyWith(
       fontFamily: AppFonts.serif,
       fontFamilyFallback: AppFonts.serifFallback,
+    );
+  }
+
+  /// 网页版：给主题里每个文字样式补上内置字体回退链。
+  ///
+  /// CanvasKit 不会去读系统字体，不带 fallback 的中文会显示成方框。
+  static TextTheme withWebFallback(TextTheme base) {
+    TextStyle? fix(TextStyle? style) {
+      if (style == null) {
+        return null;
+      }
+      return style.copyWith(
+        fontFamilyFallback: <String>[
+          ...?style.fontFamilyFallback,
+          ...AppFonts.webFallback,
+        ],
+      );
+    }
+
+    return base.copyWith(
+      displayLarge: fix(base.displayLarge),
+      displayMedium: fix(base.displayMedium),
+      displaySmall: fix(base.displaySmall),
+      headlineLarge: fix(base.headlineLarge),
+      headlineMedium: fix(base.headlineMedium),
+      headlineSmall: fix(base.headlineSmall),
+      titleLarge: fix(base.titleLarge),
+      titleMedium: fix(base.titleMedium),
+      titleSmall: fix(base.titleSmall),
+      bodyLarge: fix(base.bodyLarge),
+      bodyMedium: fix(base.bodyMedium),
+      bodySmall: fix(base.bodySmall),
+      labelLarge: fix(base.labelLarge),
+      labelMedium: fix(base.labelMedium),
+      labelSmall: fix(base.labelSmall),
     );
   }
 }

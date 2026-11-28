@@ -120,6 +120,47 @@ class BookParser {
     }
   }
 
+  /// 解析内存中的文件字节（网页版没有文件系统，导入时走这条入口）。
+  Future<List<ParsedBook>> parseBytes(String fileName, Uint8List bytes) async {
+    final String extension =
+        p.extension(fileName).replaceFirst('.', '').toLowerCase();
+    final String displayName = p.basename(fileName);
+
+    switch (extension) {
+      case 'epub':
+        return <ParsedBook>[
+          await _parseEpubBytes(bytes, displayName),
+        ];
+      case 'txt':
+      case 'md':
+      case 'markdown':
+        return <ParsedBook>[
+          await _parseTextBytes(bytes, displayName, extension),
+        ];
+      case 'docx':
+        return <ParsedBook>[
+          await _parseDocxBytes(bytes, displayName),
+        ];
+      case 'zip':
+        return _parseZipBytes(bytes, displayName);
+      case 'cbx':
+      case 'cbz':
+        throw BookParseException(
+          '网页版暂不支持漫画包，请使用 Android 客户端导入 CBX / CBZ。',
+        );
+      case 'pdf':
+        throw BookParseException(
+          'PDF 正文解析暂未支持，请先转换为 TXT 或 EPUB 后再导入。',
+        );
+      case 'doc':
+        throw BookParseException(
+          'DOC 为旧版二进制格式，暂无法提取正文，请另存为 DOCX 后再导入。',
+        );
+      default:
+        throw BookParseException('暂不支持 .$extension 格式');
+    }
+  }
+
   // ---------------- 漫画（CBX / CBZ） ----------------
 
   /// 漫画包：解压图片为页，一页一章，正文位置存图片绝对路径。

@@ -48,6 +48,19 @@ class ImportProgress {
   final String? message;
 }
 
+/// 一个待导入的源文件：给路径（Android）或给字节（网页版）。
+class ImportSource {
+  ImportSource.file(String this.path)
+      : bytes = null,
+        name = p.basename(path);
+
+  ImportSource.memory(this.name, Uint8List this.bytes) : path = null;
+
+  final String? path;
+  final Uint8List? bytes;
+  final String name;
+}
+
 /// 解析出来的「一卷」，仍带着它来自哪个源文件，便于进度回填。
 class ImportedVolume {
   const ImportedVolume({
@@ -117,14 +130,25 @@ class BookImportService {
   Future<ImportPlan> prepare(
     List<String> paths, {
     void Function(ImportProgress progress)? onProgress,
+  }) {
+    return prepareSources(
+      paths.map(ImportSource.file).toList(),
+      onProgress: onProgress,
+    );
+  }
+
+  /// 第一步（按来源）：每项可以是磁盘路径（Android），也可以是内存字节（网页版）。
+  Future<ImportPlan> prepareSources(
+    List<ImportSource> sources, {
+    void Function(ImportProgress progress)? onProgress,
   }) async {
     final List<ImportedVolume> volumes = <ImportedVolume>[];
     final List<String> failures = <String>[];
-    final int total = paths.length;
+    final int total = sources.length;
 
     for (int index = 0; index < total; index++) {
-      final String path = paths[index];
-      final String label = p.basename(path);
+      final ImportSource source = sources[index];
+      final String label = source.name;
       onProgress?.call(ImportProgress(
         index: index,
         total: total,
@@ -134,7 +158,9 @@ class BookImportService {
       ));
 
       try {
-        final List<ParsedBook> parsed = await _parser.parseFile(path);
+        final List<ParsedBook> parsed = source.bytes != null
+            ? await _parser.parseBytes(source.name, source.bytes!)
+            : await _parser.parseFile(source.path!);
         for (final ParsedBook document in parsed) {
           volumes.add(ImportedVolume(
             document: document,

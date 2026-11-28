@@ -72,6 +72,9 @@ class BookCarouselState extends State<BookCarousel> {
 
   int get _count => widget.books.length;
 
+  /// 书太少时不做循环：否则一本/两本会被重复画成三本。
+  bool get _loopEnabled => _count > 2;
+
   int _bookIndexOf(int rawIndex) {
     if (_count <= 0) {
       return 0;
@@ -85,7 +88,7 @@ class BookCarouselState extends State<BookCarousel> {
     final int initial = widget.books.isEmpty
         ? 0
         : widget.initialIndex.clamp(0, widget.books.length - 1).toInt();
-    final int start = initial + _count * _loopBase;
+    final int start = _loopEnabled ? initial + _count * _loopBase : initial;
     _page = start.toDouble();
     _controller = PageController(
       viewportFraction: _viewportFraction,
@@ -102,8 +105,10 @@ class BookCarouselState extends State<BookCarousel> {
     if (oldWidget.books.length != widget.books.length &&
         _count > 0 &&
         _controller.hasClients) {
-      final int target =
-          widget.initialIndex.clamp(0, _count - 1).toInt() + _count * _loopBase;
+      final int target = _loopEnabled
+          ? widget.initialIndex.clamp(0, _count - 1).toInt() +
+              _count * _loopBase
+          : widget.initialIndex.clamp(0, _count - 1).toInt();
       _page = target.toDouble();
       _controller.jumpToPage(target);
     }
@@ -242,7 +247,8 @@ class BookCarouselState extends State<BookCarousel> {
               Positioned.fill(
                 child: PageView.builder(
                   controller: _controller,
-                  // itemCount 传 null = 无限循环：一本接一本绕成环。
+                  // itemCount 传 null = 无限循环；书太少时退回有限列表。
+                  itemCount: _loopEnabled ? null : _count,
                   itemBuilder: (BuildContext context, int index) {
                     return AnimatedBuilder(
                       animation: _controller,

@@ -409,7 +409,9 @@ class _ImportPageState extends State<ImportPage> {
         children: <Widget>[
           LiquidGlass(
             borderRadius: 20,
-            onTap: _c.scanning ? null : _c.scan,
+            onTap: _c.scanning
+                ? null
+                : (_c.canScanStorage ? _c.scan : _c.pickManually),
             child: SizedBox(
               height: 52,
               child: Row(
@@ -426,7 +428,9 @@ class _ImportPageState extends State<ImportPage> {
                     )
                   else
                     Icon(
-                      Icons.manage_search_rounded,
+                      _c.canScanStorage
+                          ? Icons.manage_search_rounded
+                          : Icons.folder_open_rounded,
                       size: 19,
                       color: AppColors.accent(brightness),
                     ),
@@ -437,7 +441,9 @@ class _ImportPageState extends State<ImportPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          _c.scanning ? '正在扫描本机文件…' : '扫描本机文件',
+                          _c.scanning
+                              ? '正在读取文件…'
+                              : (_c.canScanStorage ? '扫描本机文件' : '选择要导入的文件'),
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -447,7 +453,9 @@ class _ImportPageState extends State<ImportPage> {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          'SCAN LOCAL STORAGE',
+                          _c.canScanStorage
+                              ? 'SCAN LOCAL STORAGE'
+                              : 'CHOOSE FILES',
                           style: AppTypography.englishLabel(brightness,
                                   fontSize: 7.8, letterSpacing: 2.0)
                               .copyWith(
@@ -466,14 +474,16 @@ class _ImportPageState extends State<ImportPage> {
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          GhostButton(
-            label: '手动选择文件',
-            english: 'Pick files',
-            icon: Icons.file_open_outlined,
-            onTap: _c.scanning ? null : _c.pickManually,
-            expand: true,
-          ),
+          if (_c.canScanStorage) ...<Widget>[
+            const SizedBox(height: 10),
+            GhostButton(
+              label: '手动选择文件',
+              english: 'Pick files',
+              icon: Icons.file_open_outlined,
+              onTap: _c.scanning ? null : _c.pickManually,
+              expand: true,
+            ),
+          ],
         ],
       ),
     );
@@ -565,7 +575,7 @@ class _ImportPageState extends State<ImportPage> {
               ),
               const SizedBox(height: 4),
               Text(
-                '点上方按钮扫描，或手动选择文件',
+                _c.canScanStorage ? '点上方按钮扫描，或手动选择文件' : '点上方按钮，从设备里选择要导入的文件',
                 style: TextStyle(
                   fontSize: 10,
                   color: AppColors.textTertiary(brightness),

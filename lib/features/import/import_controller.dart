@@ -1,6 +1,11 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
 
 import '../../core/constants/app_constants.dart';
+import '../../core/platform/platform_store.dart';
 import '../../core/models/import_site.dart';
 import '../../core/services/book_import_service.dart';
 import '../../core/services/import_site_repository.dart';
@@ -18,6 +23,12 @@ class ImportController extends ChangeNotifier {
   })  : _scanner = scanner,
         _importService = importService,
         _siteRepository = siteRepository;
+
+  /// 网页版选中的文件内容：key 是 [LocalFileEntry.path] 里的伪路径。
+  final Map<String, Uint8List> _webBytes = <String, Uint8List>{};
+
+  /// 网页版没有文件系统，只能手动选文件，不能扫描目录。
+  bool get canScanStorage => !PlatformStore.isWeb;
 
   final LocalFileScanner _scanner;
   final BookImportService _importService;
@@ -156,8 +167,9 @@ class ImportController extends ChangeNotifier {
     _scanning = true;
     notifyListeners();
     try {
-      final List<LocalFileEntry> picked =
-          await _scanner.pickFiles(extensions: Set<String>.from(_formats));
+      final List<LocalFileEntry> picked = PlatformStore.isWeb
+          ? await _pickWebFiles()
+          : await _scanner.pickFiles(extensions: Set<String>.from(_formats));
       if (picked.isNotEmpty) {
         final Map<String, LocalFileEntry> merged = <String, LocalFileEntry>{
           for (final LocalFileEntry entry in _entries) entry.path: entry,
@@ -176,6 +188,42 @@ class ImportController extends ChangeNotifier {
       _scanning = false;
       notifyListeners();
     }
+  }
+
+  /// 网页版直接读取文件字节（浏览器没有真实路径）。
+  Future<List<LocalFileEntry>> _pickWebFiles() async {
+    final FilePickerResult? result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      withData: true,
+      type: FileType.custom,
+      allowedExtensions: _formats.whereType<String>().toList(),
+    );
+    if (result == null) {
+      return const <LocalFileEntry>[];
+    }
+    final List<LocalFileEntry> picked = <LocalFileEntry>[];
+    int index = 0;
+    for (final PlatformFile file in result.files) {
+      final Uint8List? bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        continue;
+      }
+      final String extension =
+          p.extension(file.name).replaceFirst('.', '').toLowerCase();
+      if (!_formats.contains(extension)) {
+        continue;
+      }
+      final String key = 'web:$index:${file.name}';
+      _webBytes[key] = bytes;
+      index++;
+      picked.add(LocalFileEntry(
+        path: key,
+        name: file.name,
+        size: bytes.length,
+        extension: extension,
+      ));
+    }
+    return picked;
   }
 
   void toggleEntry(String path) {
@@ -212,13 +260,19 @@ class ImportController extends ChangeNotifier {
     _failures = const <String>[];
     notifyListeners();
 
-    final List<String> paths = _entries
+    final List<LocalFileEntry> chosen = _entries
         .where((LocalFileEntry entry) => _selectedPaths.contains(entry.path))
-        .map((LocalFileEntry entry) => entry.path)
         .toList();
 
-    final ImportPlan plan = await _importService.prepare(
-      paths,
+    final List<ImportSource> sources = chosen.map((LocalFileEntry entry) {
+      final Uint8List? bytes = _webBytes[entry.path];
+      return bytes != null
+          ? ImportSource.memory(entry.name, bytes)
+          : ImportSource.file(entry.path);
+    }).toList();
+
+    final ImportPlan plan = await _importService.prepareSources(
+      sources,
       onProgress: _handleProgress,
     );
     _failures = plan.failures;

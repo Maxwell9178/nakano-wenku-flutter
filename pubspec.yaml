@@ -50,6 +50,8 @@ dependencies:
 
   # 把「读完卡片」保存到系统相册（读取相册权限不涉及，只写入）。
   gal: ">=2.3.0 <3.0.0"
+  # 网页版：浏览器里没有文件系统，章节正文与封面字节存在 IndexedDB
+  idb_shim: ">=2.4.0 <3.0.0"
 
 dev_dependencies:
   flutter_test:
@@ -69,6 +71,9 @@ flutter:
     - family: NWSerif
       fonts:
         - asset: assets/fonts/NWSerifSC-Regular.otf
+    - family: NWSansSC
+      fonts:
+        - asset: assets/fonts/NWSansSC-Regular.otf
 
   # 说明：
   # 1. 中文标题统一走内置 NWSerif，缺失字形回退到系统宋体链。

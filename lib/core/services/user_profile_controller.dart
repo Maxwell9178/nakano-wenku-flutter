@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import '../constants/app_constants.dart';
 import '../constants/storage_keys.dart';
 import 'backup_import_service.dart';
+import '../platform/platform_store.dart';
 import 'local_storage_service.dart';
 
 /// 账号相关的可展示异常。
@@ -251,6 +252,13 @@ class UserProfileController extends ChangeNotifier {
   /// 拷贝失败不阻断账号创建：直接返回 null，界面回退为默认头像。
   Future<String?> _persistAvatarFile(String sourcePath) async {
     try {
+      if (PlatformStore.isWeb) {
+        final Uint8List? bytes = await PlatformStore.readBytes(sourcePath);
+        if (bytes == null || bytes.isEmpty) {
+          return null;
+        }
+        return _persistAvatarBytes(bytes);
+      }
       final File source = File(sourcePath);
       if (!await source.exists()) {
         return null;
@@ -272,6 +280,12 @@ class UserProfileController extends ChangeNotifier {
   /// 把备份包内的 avatar.png 字节写入私有目录。
   Future<String?> _persistAvatarBytes(Uint8List bytes) async {
     try {
+      if (PlatformStore.isWeb) {
+        return PlatformStore.writeBytes(
+          'profile/avatar_${DateTime.now().millisecondsSinceEpoch}.png',
+          bytes,
+        );
+      }
       final Directory dir = await _profileDirectory();
       final String fileName =
           'avatar_${DateTime.now().millisecondsSinceEpoch}.png';

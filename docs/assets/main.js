@@ -127,7 +127,12 @@
   });
 
   const iosBtn = document.getElementById("iosBtn");
-  if (iosBtn) iosBtn.addEventListener("click", function () { openModal("iosModal"); });
+  // #iosBtn 现在是跳转网页版的链接；安装步骤挂在一个次级入口上
+  const iosHowBtn = document.getElementById("iosHowBtn");
+  if (iosHowBtn) iosHowBtn.addEventListener("click", function (e) {
+    e.preventDefault();
+    openModal("iosModal");
+  });
 
   const donateBtn = document.getElementById("donateBtn");
   if (donateBtn) donateBtn.addEventListener("click", function () { openModal("donateModal"); });

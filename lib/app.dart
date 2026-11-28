@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -83,14 +84,23 @@ class NakanoWenkuApp extends StatelessWidget {
       ],
       child: Consumer<AppSettingsController>(
         builder: (BuildContext context, AppSettingsController settings, _) {
-          final ThemeData light = AppTypography.themeWithFont(
+          ThemeData light = AppTypography.themeWithFont(
             AppTheme.light(),
             settings.fontFamilyOverride,
           );
-          final ThemeData dark = AppTypography.themeWithFont(
+          ThemeData dark = AppTypography.themeWithFont(
             AppTheme.dark(),
             settings.fontFamilyOverride,
           );
+          if (kIsWeb) {
+            // Web 端读不到系统字体，必须补内置中文字体，否则全是方框。
+            light = light.copyWith(
+              textTheme: AppTypography.withWebFallback(light.textTheme),
+            );
+            dark = dark.copyWith(
+              textTheme: AppTypography.withWebFallback(dark.textTheme),
+            );
+          }
 
           return MaterialApp(
             title: 'NakanoWenku',

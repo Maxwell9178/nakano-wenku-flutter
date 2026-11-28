@@ -7,6 +7,7 @@ import '../../../core/settings/app_settings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/thin_divider.dart';
+import '../../../core/platform/platform_image.dart';
 
 /// 书籍封面绘制组件。
 ///
@@ -135,8 +136,8 @@ class BookCoverArt extends StatelessWidget {
     final String? path = book.coverPath;
 
     if (path != null && path.isNotEmpty) {
-      return Image.file(
-        File(path),
+      return PlatformImage(
+        path: path,
         fit: BoxFit.cover,
         // 封面文件被用户删除时不报错，回落到绘制封面。
         errorBuilder: (BuildContext context, Object error, StackTrace? stack) {

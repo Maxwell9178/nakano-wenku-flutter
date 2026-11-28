@@ -32,6 +32,7 @@ import '../bookshelf/widgets/book_cover_art.dart';
 import '../reader/reader_arguments.dart';
 import 'book_detail_controller.dart';
 import 'widgets/book_share_card.dart';
+import '../../core/platform/platform_image.dart';
 
 /// 书籍详情页：封面 / 元信息 / 章节目录 / 标签管理 / 元数据编辑。
 ///
@@ -751,8 +752,8 @@ class _BookDetailPageState extends State<BookDetailPage> {
                   onTap: () => Navigator.of(dialogContext).pop(),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      file,
+                    child: PlatformImage(
+                      path: file.path,
                       fit: BoxFit.contain,
                       errorBuilder: (BuildContext context, Object error,
                           StackTrace? stack) {

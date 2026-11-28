@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/models/reading_preferences.dart';
 import '../../../core/widgets/grid_background.dart';
+import '../../../core/platform/platform_image.dart';
 
 /// 阅读页背景。
 ///
@@ -79,8 +80,8 @@ class ReaderBackgroundView extends StatelessWidget {
       return Stack(
         fit: StackFit.expand,
         children: <Widget>[
-          Image.file(
-            File(path),
+          PlatformImage(
+            path: path,
             fit: BoxFit.cover,
             errorBuilder:
                 (BuildContext context, Object error, StackTrace? stackTrace) {

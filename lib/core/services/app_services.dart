@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../platform/platform_store.dart';
 import '../settings/app_settings.dart';
 import 'account_data_service.dart';
 import 'backup_import_service.dart';
@@ -105,6 +106,10 @@ class AppServices {
       return;
     }
 
+    if (PlatformStore.isWeb) {
+      // 先确保浏览器里的数据库表建好，避免首次写入静默失败。
+      await PlatformStore.ensureReady();
+    }
     storage = await LocalStorageService.create();
     settings = AppSettingsController(storage)..load();
     profile = UserProfileController(storage)..load();
