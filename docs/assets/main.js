@@ -233,6 +233,29 @@
     if (item.open) loadNote(item);
   });
 
+  /* ---------- 同步最新版本号（失败则保留页面上写死的版本） ---------- */
+  (function syncLatest() {
+    const verEl = document.getElementById("androidVersion");
+    const btnEl = document.getElementById("androidDownload");
+    const labelEl = document.getElementById("androidDownloadLabel");
+    if (!verEl || !btnEl) return;
+    const manifest = "https://raw.githubusercontent.com/Maxwell9178/nakano-wenku-flutter/main/version.json";
+    fetch(manifest, { cache: "no-store" })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (data) {
+        if (!data || !data.versionName) return;
+        const name = String(data.versionName).trim();
+        if (!/^\d+(\.\d+)+$/.test(name)) return;
+        verEl.textContent = "v" + name;
+        if (labelEl) labelEl.textContent = "安装安卓版 v" + name;
+        if (data.downloadUrl) btnEl.setAttribute("href", data.downloadUrl);
+        if (data.changelog && String(data.changelog).trim()) {
+          btnEl.setAttribute("title", "本次更新：" + String(data.changelog).trim().split("\n")[0]);
+        }
+      })
+      .catch(function () { /* 离线或跨域失败时保持页面默认值 */ });
+  })();
+
   /* ---------- 平滑锚点（兼容不支持 scroll-behavior 的浏览器） ---------- */
   document.addEventListener("click", function (event) {
     const link = event.target.closest('a[href^="#"]');
