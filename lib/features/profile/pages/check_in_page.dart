@@ -305,7 +305,7 @@ class _DayCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color accent = AppColors.accent(brightness);
     final Color borderColor = checked
-        ? AppColors.alpha(accent, 0.55)
+        ? AppColors.alpha(AppColors.textSecondary(brightness), 0.55)
         : AppColors.alpha(AppColors.divider(brightness), 0.8);
 
     return Column(

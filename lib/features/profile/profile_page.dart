@@ -12,6 +12,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/feedback.dart';
 import '../../core/widgets/confirm_dialog.dart';
+import '../../core/widgets/donate_dialog.dart';
 import '../../core/widgets/grid_background.dart';
 import '../../core/widgets/liquid_glass.dart';
 import '../../core/widgets/pressable_scale.dart';
@@ -21,7 +22,9 @@ import '../../core/widgets/thin_divider.dart';
 import '../backup/wkarchive_flow.dart';
 import '../onboarding/widgets/avatar_picker.dart';
 import '../settings/pages/version_page.dart';
+import 'pages/about_support_page.dart';
 import 'pages/book_list_page.dart';
+import 'pages/changelog_page.dart';
 import 'pages/check_in_page.dart';
 import 'profile_controller.dart';
 import 'widgets/tag_radar_chart.dart';
@@ -237,6 +240,13 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         const SizedBox(height: 16),
                         _buildBackupRow(brightness),
+                        const SizedBox(height: 30),
+                        const SectionHeader(
+                          title: '关于与支持',
+                          english: 'ABOUT & SUPPORT',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildAboutEntries(brightness),
                         const SizedBox(height: 34),
                         _buildDeleteAccount(brightness),
                       ],
@@ -490,6 +500,54 @@ class _ProfilePageState extends State<ProfilePage> {
                 '${AppConstants.versionCode}',
             brightness: brightness,
             onTap: _openVersionPage,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- 关于与支持入口 ----------------
+
+  /// 关于与支持：打赏、安全声明 / 技术说明 / 关于作者、更新日志。
+  ///
+  /// 这些内容原来被塞在设置页最底部，几乎没人翻得到；
+  /// 现在直接放在「我的」页面，打赏入口一眼可见。
+  Widget _buildAboutEntries(Brightness brightness) {
+    return LiquidGlass(
+      borderRadius: 22,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        children: <Widget>[
+          _EntryRow(
+            icon: Icons.local_cafe_outlined,
+            title: '打赏支持',
+            subtitle: '如果你对这个项目感兴趣，可以请我喝杯咖啡',
+            brightness: brightness,
+            onTap: () => showDonateDialog(context),
+          ),
+          _entryDivider(brightness),
+          _EntryRow(
+            icon: Icons.info_outline_rounded,
+            title: '关于与支持',
+            subtitle: '安全声明 · 技术说明 · 关于作者',
+            brightness: brightness,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (BuildContext context) => const AboutSupportPage(),
+              ),
+            ),
+          ),
+          _entryDivider(brightness),
+          _EntryRow(
+            icon: Icons.history_rounded,
+            title: '更新日志',
+            subtitle: '当前版本 v${AppConstants.versionName}',
+            brightness: brightness,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (BuildContext context) => const ChangelogPage(),
+              ),
+            ),
           ),
         ],
       ),

@@ -4,7 +4,7 @@ publish_to: "none"
 
 # 版本号规则：versionName+versionCode。
 # 后续版本更新模块中的 version.json 需要与这里保持一致。
-version: 1.0.3+4
+version: 1.0.4+5
 
 environment:
   sdk: ">=3.0.0 <4.0.0"

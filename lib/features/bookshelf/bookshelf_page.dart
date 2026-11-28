@@ -15,6 +15,7 @@ import 'bookshelf_controller.dart';
 import 'widgets/book_carousel.dart';
 import 'widgets/book_info_panel.dart';
 import 'widgets/book_list_item.dart';
+import 'widgets/shelf_scrubber.dart';
 import 'widgets/tag_filter_bar.dart';
 
 /// 书架页。
@@ -35,6 +36,13 @@ class BookshelfPage extends StatefulWidget {
 
 class _BookshelfPageState extends State<BookshelfPage> {
   BookshelfController? _controller;
+
+  /// 书架轮播的状态引用：底部滑动条用它直接驱动书架。
+  final GlobalKey<BookCarouselState> _carouselKey =
+      GlobalKey<BookCarouselState>();
+
+  /// 书架在一轮里的位置（0~1），跟随滑动实时更新。
+  double _shelfFraction = 0;
 
   @override
   void didChangeDependencies() {
@@ -91,13 +99,36 @@ class _BookshelfPageState extends State<BookshelfPage> {
       children: <Widget>[
         const SizedBox(height: 2),
         BookCarousel(
+          key: _carouselKey,
           books: controller.books,
           initialIndex: controller.currentIndex,
           stageHeight: stageHeight,
           onCenterChanged: controller.selectIndex,
           onBookTap: _openDetail,
+          onFractionChanged: (double value) {
+            if ((value - _shelfFraction).abs() < 0.001) {
+              return;
+            }
+            setState(() => _shelfFraction = value);
+          },
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 6),
+        // 手动滑动条：书多了以后不必反复滑动，直接拖到目标位置。
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 26),
+          child: ShelfScrubber(
+            fraction: _shelfFraction,
+            onScrub: (double value) {
+              setState(() => _shelfFraction = value);
+              _carouselKey.currentState?.seekToFraction(value);
+            },
+            onWrap: () {
+              _carouselKey.currentState?.wrapToStart();
+              setState(() => _shelfFraction = 0);
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
         if (current != null)
           BookInfoPanel(
             book: current,

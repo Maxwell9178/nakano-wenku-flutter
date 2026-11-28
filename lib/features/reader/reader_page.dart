@@ -321,11 +321,16 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
       return;
     }
 
-    final DateTime now = DateTime.now();
+    // 1) 百分比每条滚动事件都立刻更新。这里只读两个数字，
+    //    开销可以忽略；以前把它塞进 120ms 节流里，手指停下后的
+    //    最后一次事件经常被吞掉，于是百分比就卡在旧值上不动。
+    _applyScrollProgress();
+
+    // 2) 章节名同步、章节末提示要读 RenderBox，仍然节流到 ~120ms。
     if (_positionSyncQueued) {
       return;
     }
-    if (now.difference(_lastChapterSync) < _chapterSyncInterval) {
+    if (DateTime.now().difference(_lastChapterSync) < _chapterSyncInterval) {
       return;
     }
     _positionSyncQueued = true;
@@ -336,43 +341,26 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
         return;
       }
       _syncReadingPosition();
-      _updateScrollProgress();
+      _applyScrollProgress();
       _detectChapterEnding();
     });
   }
 
-  /// 按「第几章 + 章内比例」计算整本书进度。
+  /// 用「滚动偏移 / 可滚动总长」直接算出整本书进度。
   ///
-  /// 以前用「滚动偏移 / 可滚动总长」，各章长短差很多时会出现
-  /// 「显示第 3 章、进度却已经 40%」这种对不上的情况；
-  /// 改成章节加权后，进度与顶部章节名永远一致，读到最后一章末尾正好 100%。
-  void _updateScrollProgress() {
+  /// 读到最底部就是精确的 100%，不依赖章节高度的估算，
+  /// 也不会再出现「读完只显示 90%」。
+  void _applyScrollProgress() {
     final ReaderController? controller = _controller;
-    if (controller == null) {
+    if (controller == null || !_scroll.hasClients) {
       return;
     }
-    final int total = controller.chapterCount;
-    if (total <= 0) {
-      return;
-    }
-    final RenderBox? area = _listRenderBox();
-    double progress = controller.progress;
-    if (area != null) {
-      final int current = controller.currentChapter.clamp(0, total - 1);
-      final double? top = _chapterTop(current, area);
-      if (top != null) {
-        final double? nextTop = current + 1 < total
-            ? _chapterTop(current + 1, area)
-            : _chapterEndBottom(current, area);
-        final double height =
-            (nextTop == null) ? area.size.height : math.max(1.0, nextTop - top);
-        // 章首已经滚出视口多少（top 为负值），除以本章高度就是章内比例。
-        final double intra = (-top / height).clamp(0.0, 1.0).toDouble();
-        progress = (current + intra) / total;
-      }
-    }
-    controller.updateProgress(progress.clamp(0.0, 1.0).toDouble());
-    final int percent = controller.progressPercent;
+    final ScrollPosition position = _scroll.position;
+    final double max = position.maxScrollExtent;
+    final double ratio =
+        max <= 0 ? 1.0 : (position.pixels / max).clamp(0.0, 1.0).toDouble();
+    controller.updateProgress(ratio);
+    final int percent = (ratio * 100).round().clamp(0, 100);
     if (_percent.value != percent) {
       _percent.value = percent;
     }
@@ -1115,19 +1103,30 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
         ReaderBackgroundView.textColor(controller.backgroundId);
     final Color subColor =
         ReaderBackgroundView.secondaryTextColor(controller.backgroundId);
-    return ListView.builder(
-      key: _listAreaKey,
-      controller: _scroll,
-      padding: EdgeInsets.fromLTRB(
-        prefs.leftMargin,
-        prefs.topMargin,
-        prefs.rightMargin,
-        prefs.bottomMargin + (_immersive ? 56 : 84),
-      ),
-      itemCount: controller.chapters.length,
-      itemBuilder: (BuildContext context, int index) {
-        return _buildChapterChunk(controller, index, textColor, subColor);
+    // 兜尾：手指离开后系统只会再补一个 ScrollEndNotification，
+    // 这里强制刷新一次进度与章节，保证百分比永远停在与画面一致的位置。
+    return NotificationListener<ScrollNotification>(
+      onNotification: (ScrollNotification notification) {
+        if (notification is ScrollEndNotification) {
+          _applyScrollProgress();
+          _syncReadingPosition();
+        }
+        return false;
       },
+      child: ListView.builder(
+        key: _listAreaKey,
+        controller: _scroll,
+        padding: EdgeInsets.fromLTRB(
+          prefs.leftMargin,
+          prefs.topMargin,
+          prefs.rightMargin,
+          prefs.bottomMargin + (_immersive ? 56 : 84),
+        ),
+        itemCount: controller.chapters.length,
+        itemBuilder: (BuildContext context, int index) {
+          return _buildChapterChunk(controller, index, textColor, subColor);
+        },
+      ),
     );
   }
 

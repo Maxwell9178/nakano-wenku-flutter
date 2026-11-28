@@ -834,7 +834,7 @@ class _GlassSwitch extends StatelessWidget {
               : AppColors.alpha(AppColors.textPrimary(brightness), 0.08),
           border: Border.all(
             color: value
-                ? AppColors.alpha(accent, 0.60)
+                ? AppColors.alpha(AppColors.textSecondary(brightness), 0.60)
                 : AppColors.alpha(AppColors.textPrimary(brightness), 0.16),
             width: 0.9,
           ),

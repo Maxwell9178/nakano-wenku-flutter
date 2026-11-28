@@ -26,6 +26,7 @@ class BookCarousel extends StatefulWidget {
     required this.onCenterChanged,
     required this.onBookTap,
     this.stageHeight = 320,
+    this.onFractionChanged,
   });
 
   final List<Book> books;
@@ -40,11 +41,16 @@ class BookCarousel extends StatefulWidget {
 
   final double stageHeight;
 
+  /// 一轮书架的滑动位置（0 = 第一本，1 = 最后之后），
+  /// 用于同步底部的滑动条。
+  final ValueChanged<double>? onFractionChanged;
+
   @override
-  State<BookCarousel> createState() => _BookCarouselState();
+  State<BookCarousel> createState() => BookCarouselState();
 }
 
-class _BookCarouselState extends State<BookCarousel> {
+/// 书架轮播的状态，暴露 [seekToFraction] 供底部滑动条驱动。
+class BookCarouselState extends State<BookCarousel> {
   /// 单页占视口比例：单屏同时看清中间一本 + 左右各一本。
   static const double _viewportFraction = 0.26;
 
@@ -125,10 +131,52 @@ class _BookCarouselState extends State<BookCarousel> {
     // controller.page 计算，这里不触发整页重建，避免每帧抖动。
     _page = next;
 
+    // 滑动条跟随：连续汇报一轮内的位置（0~1）。
+    widget.onFractionChanged?.call(_fractionOf(next));
+
     // 只在跨过整数本时通知外部，信息区按书籍变化淡入刷新。
     if (centerChanged) {
       widget.onCenterChanged(_bookIndexOf(next.round()));
     }
+  }
+
+  /// 当前页在一轮书架里的位置（0~1）。
+  double _fractionOf(double page) {
+    if (_count <= 0) {
+      return 0;
+    }
+    final double wrapped = ((page % _count) + _count) % _count;
+    return (wrapped / _count).clamp(0.0, 1.0).toDouble();
+  }
+
+  /// 外部（底部滑动条）驱动书架：直接定位到一轮内的指定位置。
+  ///
+  /// 不带动画地跟手，滑到头由调用方决定是否回卷到开头。
+  void seekToFraction(double fraction) {
+    if (_count <= 0 || !_controller.hasClients) {
+      return;
+    }
+    final double clamped = fraction.clamp(0.0, 1.0).toDouble();
+    final double current = _controller.page ?? _page;
+    // 保持在当前这一轮里移动，避免跨轮跳动造成视觉跳变。
+    final double cycleStart = current - ((current % _count) + _count) % _count;
+    final double target = cycleStart + clamped * _count;
+    _page = target;
+    _controller.jumpToPage(target.round());
+  }
+
+  /// 滑到头后回到「第一本」：整体前移一轮，视觉上是同一本书，
+  /// 但滑动条重新从最左边开始。
+  void wrapToStart() {
+    if (_count <= 0 || !_controller.hasClients) {
+      return;
+    }
+    final double current = _controller.page ?? _page;
+    final double wrapped = ((current % _count) + _count) % _count;
+    final double target = current - wrapped + _count;
+    _page = target;
+    _controller.jumpToPage(target.round());
+    widget.onFractionChanged?.call(0);
   }
 
   @override

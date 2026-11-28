@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/book.dart';
 import '../../core/models/reading_preferences.dart';
-import '../../core/routing/app_routes.dart';
 import '../../core/routing/soft_page_route.dart';
 import '../../core/services/book_repository.dart';
 import '../../core/services/custom_font_service.dart';
@@ -160,8 +159,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     _buildLibraryCard(brightness, accent),
                     const SizedBox(height: 30),
                     _buildPerformanceCard(brightness, settings, accent),
-                    const SizedBox(height: 30),
-                    _buildAboutCard(brightness, accent),
                     const SizedBox(height: 28),
                     Center(
                       child: Text(
@@ -780,65 +777,6 @@ class _SettingsPageState extends State<SettingsPage> {
     await _loadBookCounts();
   }
 
-  // ---------------- 关于与版本 ----------------
-
-  Widget _buildAboutCard(Brightness brightness, Color accent) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        const SectionHeader(title: '关于与版本', english: 'ABOUT'),
-        const SizedBox(height: 14),
-        LiquidGlass(
-          borderRadius: 24,
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-          child: Column(
-            children: <Widget>[
-              _AboutRow(
-                title: '版本信息',
-                english: 'VERSION',
-                value:
-                    'v${AppConstants.versionName} · ${AppConstants.versionCode}',
-                brightness: brightness,
-                accent: accent,
-                onTap: () => Navigator.of(context).pushNamed(AppRoutes.version),
-              ),
-              ThinDivider(width: double.infinity, thickness: 0.7),
-              _AboutRow(
-                title: '安全声明',
-                english: 'SAFETY NOTICE',
-                value: '本地优先',
-                brightness: brightness,
-                accent: accent,
-                onTap: () =>
-                    Navigator.of(context).pushNamed(AppRoutes.safetyNotice),
-              ),
-              ThinDivider(width: double.infinity, thickness: 0.7),
-              _AboutRow(
-                title: '技术说明',
-                english: 'TECH NOTES',
-                value: '离线运行',
-                brightness: brightness,
-                accent: accent,
-                onTap: () =>
-                    Navigator.of(context).pushNamed(AppRoutes.techNotes),
-              ),
-              ThinDivider(width: double.infinity, thickness: 0.7),
-              _AboutRow(
-                title: '关于作者',
-                english: 'ABOUT AUTHOR',
-                value: AppConstants.author,
-                brightness: brightness,
-                accent: accent,
-                onTap: () =>
-                    Navigator.of(context).pushNamed(AppRoutes.aboutAuthor),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   // ---------------- 性能与动效 ----------------
 
   Widget _buildPerformanceCard(
@@ -1078,7 +1016,7 @@ class _ChoiceChip extends StatelessWidget {
           border: Border.all(
             width: selected ? 1.0 : 0.7,
             color: selected
-                ? AppColors.alpha(accent, 0.55)
+                ? AppColors.alpha(AppColors.textSecondary(brightness), 0.55)
                 : AppColors.divider(brightness),
           ),
         ),
@@ -1275,83 +1213,6 @@ class _LinkText extends StatelessWidget {
           fontSize: 11,
           letterSpacing: 0.4,
           color: AppColors.textTertiary(brightness),
-        ),
-      ),
-    );
-  }
-}
-
-/// 「中文标签 + 英文标注 + 右侧值」的入口行（关于与版本分组）。
-class _AboutRow extends StatelessWidget {
-  const _AboutRow({
-    required this.title,
-    required this.english,
-    required this.value,
-    required this.brightness,
-    required this.accent,
-    required this.onTap,
-  });
-
-  final String title;
-  final String english;
-  final String value;
-  final Brightness brightness;
-  final Color accent;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return PressableScale(
-      pressedScale: 0.99,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      color: AppColors.textPrimary(brightness),
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    english,
-                    style: AppTypography.englishLabel(
-                      brightness,
-                      fontSize: 8,
-                      letterSpacing: 1.8,
-                      color: AppColors.textTertiary(brightness),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 150),
-              child: Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.alpha(accent, 0.9),
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 18,
-              color: AppColors.textTertiary(brightness),
-            ),
-          ],
         ),
       ),
     );

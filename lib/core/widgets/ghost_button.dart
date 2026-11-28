@@ -45,8 +45,12 @@ class GhostButton extends StatelessWidget {
         ? AppColors.accent(brightness)
         : AppColors.textSecondary(brightness);
     final Color borderColor = AppColors.alpha(
-      accentColor,
-      enabled ? 0.45 : 0.18,
+      // 描边统一用中性灰白：装饰配色只影响填充与文字，不会在按钮上
+      // 画出带颜色的双线（之前选了淡黄装饰色时会像「黄色双线」）。
+      accent
+          ? AppColors.textSecondary(brightness)
+          : AppColors.divider(brightness),
+      enabled ? 0.34 : 0.15,
     );
 
     Widget content = Column(

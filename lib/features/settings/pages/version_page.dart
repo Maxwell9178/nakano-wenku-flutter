@@ -5,10 +5,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/models/app_update.dart';
+import '../../../core/services/apk_installer.dart';
 import '../../../core/services/update_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/feedback.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/ghost_button.dart';
 import '../../../core/widgets/grid_background.dart';
 import '../../../core/widgets/liquid_glass.dart';
@@ -100,16 +102,49 @@ class _VersionPageState extends State<VersionPage> {
     if (service == null) {
       return;
     }
-    // 先自己把安装包下到私有目录再交给系统安装器；
-    // 失败（无网络 / 无存储 / 安装器不可用）才回落到浏览器下载页。
-    showSoftMessage(context, '正在下载安装包……');
-    final bool installed = await service.downloadAndInstall(info);
+
+    // 下载期间用进度卡片占位，避免用户重复点击，也让 55MB 的等待有反馈。
+    final ValueNotifier<double> progress = ValueNotifier<double>(0);
+    final NavigatorState navigator = Navigator.of(context, rootNavigator: true);
+    bool dialogOpen = true;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext ctx) => _DownloadProgressDialog(
+        progress: progress,
+        versionName: info.versionName,
+      ),
+    ).then((_) => dialogOpen = false);
+
+    final ApkInstallResult result = await service.downloadAndInstall(
+      info,
+      onProgress: (double value) => progress.value = value,
+    );
+    if (dialogOpen) {
+      navigator.pop();
+      dialogOpen = false;
+    }
+    progress.dispose();
     if (!mounted) {
       return;
     }
-    if (installed) {
-      return;
+
+    switch (result) {
+      case ApkInstallResult.launched:
+        // 系统安装界面已经弹出，后续交给系统处理。
+        return;
+      case ApkInstallResult.needPermission:
+        await _askInstallPermission();
+        return;
+      case ApkInstallResult.missingFile:
+        showSoftMessage(context, '安装包已被系统清理，请重新下载');
+        break;
+      case ApkInstallResult.unsupported:
+      case ApkInstallResult.failed:
+        break;
     }
+
+    // 应用内安装不可用时，最后回落到浏览器下载页（仍然可以完成升级）。
     final bool opened = await service.openDownload(info);
     if (!mounted) {
       return;
@@ -117,6 +152,26 @@ class _VersionPageState extends State<VersionPage> {
     if (!opened) {
       showSoftMessage(context, '下载失败，请检查网络或稍后再试');
     }
+  }
+
+  /// 引导用户打开「安装未知应用」权限。
+  Future<void> _askInstallPermission() async {
+    final UpdateService? service = _updateService;
+    if (service == null) {
+      return;
+    }
+    final bool go = await showConfirmDialog(
+      context: context,
+      title: '需要安装权限',
+      english: 'INSTALL PERMISSION',
+      message: '应用内安装新版本需要允许「NakanoWenku 安装未知应用」，'
+          '授权后返回本页面重新点击「安装」即可。',
+      confirmLabel: '去授权',
+    );
+    if (!mounted || !go) {
+      return;
+    }
+    await service.openInstallSettings();
   }
 
   Future<void> _copyGroup() async {
@@ -487,6 +542,95 @@ class _InfoRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 应用内更新：下载进度卡片。
+///
+/// 只显示进度，不允许中途关闭（避免下到一半的 APK 被误用），
+/// 下载完成后由调用方立即 pop 并拉起系统安装器。
+class _DownloadProgressDialog extends StatelessWidget {
+  const _DownloadProgressDialog({
+    required this.progress,
+    required this.versionName,
+  });
+
+  final ValueNotifier<double> progress;
+  final String versionName;
+
+  @override
+  Widget build(BuildContext context) {
+    final Brightness brightness = Theme.of(context).brightness;
+    final Color accent = AppColors.accent(brightness);
+
+    return Center(
+      child: LiquidGlass(
+        borderRadius: 24,
+        padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
+        child: SizedBox(
+          width: 232,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                '正在下载 v$versionName',
+                style: AppTypography.chineseTitle(brightness, fontSize: 17),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'DOWNLOADING',
+                style: TextStyle(
+                  fontSize: 8.4,
+                  letterSpacing: 2.2,
+                  color: AppColors.textTertiary(brightness),
+                ),
+              ),
+              const SizedBox(height: 18),
+              ValueListenableBuilder<double>(
+                valueListenable: progress,
+                builder: (BuildContext context, double value, Widget? child) {
+                  final int percent = (value * 100).clamp(0, 100).round();
+                  return Column(
+                    children: <Widget>[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: SizedBox(
+                          height: 4,
+                          child: Stack(
+                            children: <Widget>[
+                              Positioned.fill(
+                                child: ColoredBox(
+                                  color: AppColors.alpha(accent, 0.14),
+                                ),
+                              ),
+                              FractionallySizedBox(
+                                widthFactor: value.clamp(0.0, 1.0),
+                                child: ColoredBox(
+                                  color: AppColors.alpha(accent, 0.85),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '$percent%',
+                        style: TextStyle(
+                          fontSize: 11,
+                          letterSpacing: 1.2,
+                          color: AppColors.textSecondary(brightness),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

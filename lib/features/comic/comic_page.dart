@@ -340,7 +340,11 @@ class _ModeChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.alpha(accent, 0.14),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: AppColors.alpha(accent, 0.55), width: 0.8),
+          border: Border.all(
+              color: AppColors.alpha(
+                  AppColors.textSecondary(Theme.of(context).brightness),
+                  0.55),
+              width: 0.8),
         ),
         child: Text(
           label,

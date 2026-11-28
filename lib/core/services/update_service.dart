@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_constants.dart';
 import '../constants/storage_keys.dart';
 import '../models/app_update.dart';
+import 'apk_installer.dart';
 import 'local_storage_service.dart';
 
 /// 一次更新检测的结果状态。
@@ -59,10 +60,15 @@ class UpdateService {
     this._storage, {
     Future<String> Function(Uri uri)? fetcher,
     Future<bool> Function(Uri uri)? launcher,
+    ApkInstaller installer = const ApkInstaller(),
   })  : _fetcher = fetcher,
-        _launcher = launcher;
+        _launcher = launcher,
+        _installer = installer;
 
   final LocalStorageService _storage;
+
+  /// 安装器：下载完成后把 APK 交给系统安装界面。
+  final ApkInstaller _installer;
 
   /// 可注入的请求实现（测试或离线场景使用）。
   final Future<String> Function(Uri uri)? _fetcher;
@@ -340,16 +346,21 @@ class UpdateService {
     return false;
   }
 
-  /// 下载安装包并直接拉起系统安装器。
+  /// 下载安装包并直接拉起系统安装器（应用内更新）。
   ///
-  /// 与 [openDownload] 的区别：这里不把下载交给浏览器，而是自己把 APK 拉到
-  /// 应用私有目录，再用 [OpenFilex] 交给系统安装器。系统浏览器下载受限
-  /// （部分 ROM 直接下不动或下载后找不到文件），这条路更可靠。
-  /// 任一环节失败都返回 false，由调用方回落 [openDownload]。
-  Future<bool> downloadAndInstall(
+  /// 流程：先确认「安装未知应用」权限 → 把 APK 下载到应用缓存目录 →
+  /// 通过 FileProvider 以 content:// Uri 交给系统安装器。
+  /// 返回 [ApkInstallResult]，由界面决定提示文案：
+  /// [ApkInstallResult.needPermission] 时引导用户去开权限再点一次。
+  Future<ApkInstallResult> downloadAndInstall(
     AppVersionInfo info, {
     void Function(double progress)? onProgress,
   }) async {
+    // 没有安装权限时先不下载（55MB 白下很浪费），直接让界面去引导。
+    if (!await _installer.canInstall()) {
+      return ApkInstallResult.needPermission;
+    }
+
     final List<String> candidates = <String>[
       if (info.hasDownload) info.downloadUrl,
       if (!info.hasDownload) AppConstants.updateApkUrl,
@@ -368,13 +379,24 @@ class UpdateService {
       if (saved == null) {
         continue;
       }
+
+      // 首选原生 FileProvider 通道（最可靠）。
+      final ApkInstallResult native = await _installer.install(saved);
+      if (native == ApkInstallResult.launched) {
+        return ApkInstallResult.launched;
+      }
+      if (native == ApkInstallResult.needPermission) {
+        return ApkInstallResult.needPermission;
+      }
+
+      // 原生通道不可用时，退到 open_filex 再试一次。
       try {
         final OpenResult result = await OpenFilex.open(
           saved,
           type: 'application/vnd.android.package-archive',
         );
         if (result.type == ResultType.done) {
-          return true;
+          return ApkInstallResult.launched;
         }
         lastError = '安装器启动失败：${result.message}';
         debugPrint('[NakanoWenku][update] $lastError');
@@ -382,10 +404,15 @@ class UpdateService {
         lastError = '安装器启动失败：$error';
         debugPrint('[NakanoWenku][update] $lastError');
       }
-      return false;
+      return native == ApkInstallResult.missingFile
+          ? ApkInstallResult.missingFile
+          : ApkInstallResult.failed;
     }
-    return false;
+    return ApkInstallResult.failed;
   }
+
+  /// 打开系统的「安装未知应用」授权页。
+  Future<bool> openInstallSettings() => _installer.openInstallSettings();
 
   /// 把 APK 下载到日志目录下的 `updates/` 里，返回本地路径。
   Future<String?> _downloadApk(

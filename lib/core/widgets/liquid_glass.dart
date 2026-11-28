@@ -9,19 +9,19 @@ import 'pressable_scale.dart';
 
 /// 液态玻璃容器（全局公共组件）。
 ///
-/// 这一版的材质拆成五层，目标是「看起来真的是一块玻璃」，而不是一块
-/// 半透明色块：
+/// 目标是「一块真的玻璃」，而不是半透明色块，所以材质按真实玻璃的光路分层：
 ///
-/// 1. **背景模糊**：BackdropFilter 按设置里的模糊值放大到 0~36 sigma；
-/// 2. **玻璃本体**：斜向三层渐变（左上薄、右下厚），叠一层装饰色调膜；
-/// 3. **折射高光**：左上角一团柔和的镜面高光 + 一道很淡的斜向光带，
-///    模拟玻璃边缘把环境光「折」进来的感觉；
-/// 4. **厚边**：外沿 1px 白边由亮到暗做渐变描边，内侧再收一圈细边，
-///    形成真实玻璃那种「双线边缘」；
-/// 5. **投影**：底部大范围柔和阴影，让玻璃浮在页面上而不是贴上去。
+/// 1. **背景模糊**：BackdropFilter，强度由设置里的模糊值决定（0~36 sigma）；
+/// 2. **边缘折射带**：贴着圆角内缘再叠一层更强模糊 + 提亮，
+///    模拟厚玻璃边缘把背景「折弯」的感觉 —— 这是液态感的主要来源；
+/// 3. **玻璃本体**：斜向渐变 + 装饰色调膜，左上薄、右下厚；
+/// 4. **液面反光**：左上水滴状高光、斜向流动光带、右下冷反射、
+///    以及沿圆角的月牙形镜面（`_LiquidSheenPainter`）；
+/// 5. **厚度**：顶部窄高光 + 底部内阴影 + 双层描边（外亮内暗）；
+/// 6. **投影**：底部大范围柔和阴影，让玻璃浮起来。
 ///
-/// 模糊强度、透明度、边框粗细读取全局设置，一处调整、全应用一致；
-/// 局部需要特殊材质时可用 [blurSigma] / [opacity] / [borderWidth] 覆盖。
+/// 模糊、透明度、边框粗细读取全局设置，一处调整全应用一致；
+/// 局部可用 [blurSigma] / [opacity] / [borderWidth] 覆盖。
 class LiquidGlass extends StatelessWidget {
   const LiquidGlass({
     super.key,
@@ -84,9 +84,9 @@ class LiquidGlass extends StatelessWidget {
     final Color baseTint = tint ?? AppColors.glassTint(brightness);
 
     // 斜向渐变：左上更亮、右下更薄，模拟玻璃在光下的折射。
-    final Color fillTop = AppColors.alpha(baseTint, fillOpacity + 0.12);
+    final Color fillTop = AppColors.alpha(baseTint, fillOpacity + 0.14);
     final Color fillMid = AppColors.alpha(baseTint, fillOpacity);
-    final Color fillBottom = AppColors.alpha(baseTint, fillOpacity * 0.42);
+    final Color fillBottom = AppColors.alpha(baseTint, fillOpacity * 0.38);
 
     final Widget glassSurface = ClipRRect(
       borderRadius: radius,
@@ -115,7 +115,49 @@ class LiquidGlass extends StatelessWidget {
             ),
           ),
 
-          // 3. 液态反光：模糊的弧形高光带 + 光团，模拟液体表面的张力与折射
+          // 3. 边缘折射：沿内缘再糊一层，背景在边框附近被「放大」的错觉
+          if (sheen && sigma > 0.4)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: ClipPath(
+                  clipper: _GlassEdgeBandClipper(
+                    radius: borderRadius,
+                    bandWidth: (borderRadius * 0.22).clamp(5.0, 16.0),
+                  ),
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(
+                      sigmaX: sigma * 1.9,
+                      sigmaY: sigma * 1.9,
+                    ),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: <Color>[
+                            AppColors.alpha(
+                              Colors.white,
+                              isDark ? 0.16 : 0.34,
+                            ),
+                            AppColors.alpha(
+                              Colors.white,
+                              isDark ? 0.03 : 0.14,
+                            ),
+                            AppColors.alpha(
+                              Colors.black,
+                              isDark ? 0.10 : 0.03,
+                            ),
+                          ],
+                          stops: const <double>[0.0, 0.55, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // 4. 液态反光：光团 + 流动光带 + 月牙镜面
           if (sheen)
             Positioned.fill(
               child: IgnorePointer(
@@ -123,12 +165,13 @@ class LiquidGlass extends StatelessWidget {
                   painter: _LiquidSheenPainter(
                     isDark: isDark,
                     accent: baseTint,
+                    cornerRadius: borderRadius,
                   ),
                 ),
               ),
             ),
 
-          // 4. 顶部厚度高光 + 底部内阴影
+          // 5. 顶部厚度高光 + 底部内阴影
           if (sheen)
             Positioned.fill(
               child: IgnorePointer(
@@ -138,12 +181,12 @@ class LiquidGlass extends StatelessWidget {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: <Color>[
-                        AppColors.alpha(Colors.white, isDark ? 0.18 : 0.50),
+                        AppColors.alpha(Colors.white, isDark ? 0.20 : 0.54),
                         Colors.transparent,
                         Colors.transparent,
-                        AppColors.alpha(Colors.black, isDark ? 0.26 : 0.06),
+                        AppColors.alpha(Colors.black, isDark ? 0.30 : 0.07),
                       ],
-                      stops: const <double>[0.0, 0.14, 0.70, 1.0],
+                      stops: const <double>[0.0, 0.12, 0.68, 1.0],
                     ),
                   ),
                 ),
@@ -177,7 +220,7 @@ class LiquidGlass extends StatelessWidget {
         children: <Widget>[
           glassSurface,
 
-          // 5. 玻璃边缘：外侧亮到暗的渐变描边 + 内侧细边
+          // 6. 玻璃边缘：外侧亮到暗的渐变描边 + 内侧细边
           if (sheen && stroke > 0.01)
             Positioned.fill(
               child: IgnorePointer(
@@ -210,16 +253,53 @@ class LiquidGlass extends StatelessWidget {
   }
 }
 
-/// 液态反光层：用几段高斯模糊的水滴形高光，模拟液体在玻璃表面流动时
-/// 产生的那种「边缘亮、中间透」的折射感。
-///
-/// 纯 DecoratedBox 很难做出这种效果，所以这里直接上 Canvas：
-/// 三段不同亮度、不同模糊半径的弧形色块，再加一条斜向的细光带。
+/// 只保留「边缘一条带」的裁剪器（圆角矩形挖掉中间），
+/// 用来把更强模糊的折射层限制在玻璃内缘。
+class _GlassEdgeBandClipper extends CustomClipper<Path> {
+  const _GlassEdgeBandClipper({required this.radius, required this.bandWidth});
+
+  final double radius;
+  final double bandWidth;
+
+  @override
+  Path getClip(Size size) {
+    final RRect outer = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      Radius.circular(radius),
+    );
+    final RRect inner = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        bandWidth,
+        bandWidth,
+        (size.width - bandWidth * 2).clamp(0.0, double.infinity),
+        (size.height - bandWidth * 2).clamp(0.0, double.infinity),
+      ),
+      Radius.circular((radius - bandWidth).clamp(0.0, radius)),
+    );
+    return Path()
+      ..fillType = PathFillType.evenOdd
+      ..addRRect(outer)
+      ..addRRect(inner);
+  }
+
+  @override
+  bool shouldReclip(covariant _GlassEdgeBandClipper oldClipper) {
+    return oldClipper.radius != radius || oldClipper.bandWidth != bandWidth;
+  }
+}
+
+/// 液态反光层：几段高斯模糊的水滴形高光 + 一段流动光带 + 一弯月牙镜面，
+/// 模拟液体在玻璃表面流动时「边缘亮、中间透」的折射。
 class _LiquidSheenPainter extends CustomPainter {
-  const _LiquidSheenPainter({required this.isDark, required this.accent});
+  const _LiquidSheenPainter({
+    required this.isDark,
+    required this.accent,
+    required this.cornerRadius,
+  });
 
   final bool isDark;
   final Color accent;
+  final double cornerRadius;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -228,74 +308,94 @@ class _LiquidSheenPainter extends CustomPainter {
     canvas.clipRect(rect);
 
     // 1. 左上角的水滴状光团：最大最亮的一团。
+    final Offset poolCenter = Offset(size.width * 0.16, size.height * 0.02);
+    final double poolRadius = size.shortestSide * 1.05;
     final Paint pool = Paint()
       ..shader = RadialGradient(
         colors: <Color>[
-          AppColors.alpha(Colors.white, isDark ? 0.26 : 0.62),
-          AppColors.alpha(Colors.white, isDark ? 0.06 : 0.18),
+          AppColors.alpha(Colors.white, isDark ? 0.30 : 0.72),
+          AppColors.alpha(Colors.white, isDark ? 0.10 : 0.26),
           Colors.transparent,
         ],
-        stops: const <double>[0.0, 0.45, 1.0],
+        stops: const <double>[0.0, 0.38, 1.0],
       ).createShader(
-        Rect.fromCircle(
-          center: Offset(size.width * 0.18, size.height * 0.06),
-          radius: size.shortestSide * 0.95,
-        ),
+        Rect.fromCircle(center: poolCenter, radius: poolRadius),
       );
-    canvas.drawCircle(
-      Offset(size.width * 0.18, size.height * 0.06),
-      size.shortestSide * 0.95,
-      pool,
-    );
+    canvas.drawCircle(poolCenter, poolRadius, pool);
 
-    // 2. 斜向流动光带：一条被模糊过的窄条，像液体流动的痕迹。
-    final double bandY = size.height * 0.58;
+    // 2. 斜向流动光带：被模糊过的窄条，像液体流动的痕迹。
+    final double bandY = size.height * 0.52;
     final Path band = Path()
-      ..moveTo(-size.width * 0.1, bandY)
+      ..moveTo(-size.width * 0.12, bandY)
       ..quadraticBezierTo(
-        size.width * 0.45,
-        bandY - size.height * 0.30,
-        size.width * 1.1,
-        bandY - size.height * 0.06,
+        size.width * 0.44,
+        bandY - size.height * 0.34,
+        size.width * 1.12,
+        bandY - size.height * 0.02,
       );
     final Paint bandPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = size.height * 0.14
-      ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, size.height * 0.10)
+      ..strokeWidth = size.height * 0.16
+      ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, size.height * 0.09)
       ..shader = LinearGradient(
         colors: <Color>[
-          AppColors.alpha(Colors.white, isDark ? 0.10 : 0.30),
-          AppColors.alpha(Colors.white, isDark ? 0.02 : 0.08),
+          AppColors.alpha(Colors.white, 0),
+          AppColors.alpha(Colors.white, isDark ? 0.16 : 0.42),
+          AppColors.alpha(Colors.white, 0),
         ],
+        stops: const <double>[0.0, 0.5, 1.0],
       ).createShader(rect);
     canvas.drawPath(band, bandPaint);
 
-    // 3. 右下角的一点冷反射：带一点装饰色调，让玻璃有「厚度」。
+    // 3. 沿圆角的月牙镜面：贴内缘走一圈，只亮左上那一段，
+    //    这是「液体表面张力」最直观的一笔。
+    final RRect rim = RRect.fromRectAndRadius(
+      rect.deflate(1.4),
+      Radius.circular((cornerRadius - 1.4).clamp(0.0, cornerRadius)),
+    );
+    final Paint rimPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4
+      ..maskFilter = ui.MaskFilter.blur(ui.BlurStyle.normal, 2.2)
+      ..shader = SweepGradient(
+        startAngle: -2.6,
+        endAngle: 1.2,
+        colors: <Color>[
+          AppColors.alpha(Colors.white, 0),
+          AppColors.alpha(Colors.white, isDark ? 0.34 : 0.78),
+          AppColors.alpha(Colors.white, 0),
+        ],
+        stops: const <double>[0.0, 0.42, 1.0],
+        transform: GradientRotation(-0.4),
+      ).createShader(rect);
+    canvas.drawRRect(rim, rimPaint);
+
+    // 4. 右下角的一点冷反射：带一点装饰色调，让玻璃有「厚度」。
+    final Offset cornerCenter = Offset(
+      size.width * 0.94,
+      size.height * 0.96,
+    );
+    final double cornerRadiusValue = size.shortestSide * 0.8;
     final Paint corner = Paint()
       ..shader = RadialGradient(
         colors: <Color>[
-          AppColors.alpha(accent, isDark ? 0.22 : 0.16),
+          AppColors.alpha(accent, isDark ? 0.26 : 0.20),
           Colors.transparent,
         ],
       ).createShader(
-        Rect.fromCircle(
-          center: Offset(size.width * 0.92, size.height * 0.94),
-          radius: size.shortestSide * 0.75,
-        ),
+        Rect.fromCircle(center: cornerCenter, radius: cornerRadiusValue),
       );
-    canvas.drawCircle(
-      Offset(size.width * 0.92, size.height * 0.94),
-      size.shortestSide * 0.75,
-      corner,
-    );
+    canvas.drawCircle(cornerCenter, cornerRadiusValue, corner);
 
     canvas.restore();
   }
 
   @override
   bool shouldRepaint(covariant _LiquidSheenPainter oldDelegate) {
-    return oldDelegate.isDark != isDark || oldDelegate.accent != accent;
+    return oldDelegate.isDark != isDark ||
+        oldDelegate.accent != accent ||
+        oldDelegate.cornerRadius != cornerRadius;
   }
 }
 
@@ -328,17 +428,14 @@ class _GlassEdgePainter extends CustomPainter {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: <Color>[
-          AppColors.alpha(Colors.white, isDark ? 0.62 : 0.96),
-          AppColors.alpha(Colors.white, isDark ? 0.22 : 0.55),
-          AppColors.alpha(Colors.white, isDark ? 0.08 : 0.30),
+          AppColors.alpha(Colors.white, isDark ? 0.86 : 1.0),
+          AppColors.alpha(Colors.white, isDark ? 0.26 : 0.62),
+          AppColors.alpha(Colors.white, isDark ? 0.08 : 0.32),
         ],
         stops: const <double>[0.0, 0.46, 1.0],
       ).createShader(rect);
 
-    canvas.drawRRect(
-      outer,
-      outerPaint,
-    );
+    canvas.drawRRect(outer, outerPaint);
 
     // 内圈：反方向的暗边，让厚度更明显
     final double innerInset = stroke + 0.9;
@@ -354,8 +451,8 @@ class _GlassEdgePainter extends CustomPainter {
           begin: Alignment.bottomRight,
           end: Alignment.topLeft,
           colors: <Color>[
-            AppColors.alpha(Colors.white, isDark ? 0.16 : 0.34),
-            AppColors.alpha(Colors.black, isDark ? 0.30 : 0.05),
+            AppColors.alpha(Colors.white, isDark ? 0.18 : 0.36),
+            AppColors.alpha(Colors.black, isDark ? 0.34 : 0.06),
           ],
         ).createShader(rect);
       canvas.drawRRect(inner, innerPaint);
