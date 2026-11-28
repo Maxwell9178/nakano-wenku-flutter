@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>NakanoWenku · 属于你的离线轻小说书架</title>
+<meta name="description" content="NakanoWenku 是一款开源、离线、本地优先的轻小说阅读器。EPUB / TXT / DOCX / ZIP 一键导入，3D 环形书架与液态毛玻璃界面，数据只留在你自己的手机上。" />
+<meta name="theme-color" content="#000000" />
+<link rel="icon" href="assets/icon-192.png" />
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="NakanoWenku · 属于你的离线轻小说书架" />
+<meta property="og:description" content="开源 · 离线 · 本地优先的轻小说阅读器。没有账号，没有云端，没有广告。" />
+<meta property="og:image" content="assets/icon-512.png" />
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+
+<div class="grid-bg" aria-hidden="true"></div>
+<div class="wash" aria-hidden="true"></div>
+
+<!-- 顶部导航 -->
+<header class="nav" id="nav">
+  <a class="nav-brand" href="#top">
+    <img src="assets/icon-192.png" alt="" class="nav-logo" />
+    <span class="nav-name">NakanoWenku</span>
+  </a>
+  <nav class="nav-links">
+    <a href="#features">特性</a>
+    <a href="#download">下载</a>
+    <a href="#support">支持</a>
+    <a href="#about">关于</a>
+  </nav>
+  <div class="nav-actions">
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="切换深浅色">
+      <svg viewBox="0 0 24 24" class="icon-moon" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+      <svg viewBox="0 0 24 24" class="icon-sun" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.4v2.6M12 19v2.6M4.4 4.4l1.9 1.9M17.7 17.7l1.9 1.9M2.4 12h2.6M19 12h2.6M4.4 19.6l1.9-1.9M17.7 6.3l1.9-1.9"/></svg>
+    </button>
+    <a class="btn btn-ghost btn-sm" href="https://github.com/Maxwell9178/nakano-wenku-flutter" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M12 2.2a9.8 9.8 0 0 0-3.1 19.1c.5.1.7-.2.7-.5v-1.9c-2.7.6-3.3-1.2-3.3-1.2-.4-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.8.8.1-.6.3-1.1.6-1.3-2.2-.2-4.5-1.1-4.5-4.9 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.7 1a9.3 9.3 0 0 1 4.9 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.8-2.3 4.6-4.5 4.9.3.3.7 1 .7 1.9v2.8c0 .3.2.6.7.5A9.8 9.8 0 0 0 12 2.2Z"/></svg>
+      <span>GitHub</span>
+    </a>
+    <a class="btn btn-primary btn-sm" href="#download">下载</a>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-copy">
+        <p class="eyebrow reveal">开源 · 离线 · 本地优先</p>
+        <h1 class="hero-title reveal">NakanoWenku</h1>
+        <p class="hero-sub reveal">属于你的离线轻小说书架</p>
+        <p class="hero-sign reveal">MADE BY MAXWELL</p>
+        <p class="hero-desc reveal">
+          导入即读，数据只留在本机。没有账号绑定，没有云端扫描，没有广告，
+          只有一本书、一段安静的时间，和一个不会替你决定任何事的阅读器。
+        </p>
+        <div class="hero-actions reveal">
+          <a class="btn btn-primary btn-lg" href="#download">
+            <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M12 3v11.4M7.4 10.2 12 14.8l4.6-4.6M4.6 19.4h14.8"/></svg>
+            下载 Android 版
+          </a>
+          <a class="btn btn-glass btn-lg" href="https://github.com/Maxwell9178/nakano-wenku-flutter" target="_blank" rel="noopener">
+            浏览源码
+          </a>
+        </div>
+        <ul class="hero-meta reveal">
+          <li><b>v1.0.3</b><span>最新版本</span></li>
+          <li><b>Android 7.0+</b><span>运行平台</span></li>
+          <li><b>0 广告</b><span>永久免费</span></li>
+        </ul>
+      </div>
+
+      <div class="hero-visual reveal">
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="mock-top">
+              <span class="mock-back">‹</span>
+              <span class="mock-title">夜之图书馆</span>
+              <span class="mock-icon">⤢</span>
+            </div>
+            <div class="mock-body">
+              <p class="mock-chapter">CHAPTER 04</p>
+              <h3 class="mock-heading">第四章 · 雨落的午后</h3>
+              <div class="mock-rule"></div>
+              <p class="mock-text">雨声落在窗上，像是有人在轻轻地数着什么。她把书翻到折起的那一页，读到一半的句子还停在那里，像一句没说完的话。</p>
+              <p class="mock-text">"这里很安静。"他说，"安静得像把所有声音都还给了雨。"</p>
+              <p class="mock-text">她合上书，抬头看他。窗外的天色正在往晚里走，屋子里只剩纸张和雨的味道。</p>
+            </div>
+            <div class="mock-foot">
+              <span class="mock-pill">42%</span>
+            </div>
+          </div>
+          <div class="phone-glow" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scroll-hint" aria-hidden="true"><span></span></div>
+  </section>
+
+  <!-- 特性 -->
+  <section class="section" id="features">
+    <div class="section-head">
+      <p class="eyebrow">FEATURES</p>
+      <h2 class="section-title">它替你做的事，只有「读书」</h2>
+      <p class="section-desc">功能都围绕本地阅读展开，绝不越界到你没有允许的地方。</p>
+    </div>
+
+    <div class="feature-grid">
+      <article class="glass card reveal">
+        <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M12 3.2 4.6 6.6v10.8L12 20.8l7.4-3.4V6.6L12 3.2Z"/><path d="M12 3.2v17.6M4.6 6.6 12 10.2l7.4-3.6"/></svg></div>
+        <h3>完全离线</h3>
+        <p>正文、封面、进度、摘抄、书签全部保存在本机，断网也能安静读到最后一页。</p>
+      </article>
+
+      <article class="glass card reveal">
+        <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M6 3.6h8.8L19 8v12.4H6z"/><path d="M14.4 3.6V8H19M9 12.4h7M9 15.8h5"/></svg></div>
+        <h3>多格式导入</h3>
+        <p>EPUB 优先，兼容 TXT / DOCX / MD / ZIP 与 CBX 漫画包，多卷可自动分卷或合并。</p>
+      </article>
+
+      <article class="glass card reveal">
+        <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M4 15.6V8.4l8-3.2 8 3.2v7.2"/><path d="M7.4 12.6h3v6.2h-3zM13.6 12.6h3v6.2h-3zM4 19.4h16"/></svg></div>
+        <h3>3D 环形书架</h3>
+        <p>13° 倾斜、惯性滑动、无限循环的立体书列，像在真正的书架上挑选今晚想读的那本。</p>
+      </article>
+
+      <article class="glass card reveal">
+        <div class="card-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.2"/><path d="M12 4.8v14.4M4.8 12h14.4"/></svg></div>
+        <h3>液态毛玻璃</h3>
+        <p>面板模糊与透明度可连续调节，深浅双主题、七种装饰配色，界面像玻璃一样透亮。</p>
+      </article>
+
+      <article class="glass card reveal">
+        <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M5 19.2V9.6M12 19.2V4.8M19 19.2v-6.4"/></svg></div>
+        <h3>阅读记录</h3>
+        <p>累计时长、打卡日历、兴趣雷达，安静地记录你读过什么，而不是催你多读。</p>
+      </article>
+
+      <article class="glass card reveal">
+        <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M12 3.4v10.2M8 10l4 4 4-4"/><path d="M5.2 15.4v4.2h13.6v-4.2"/></svg></div>
+        <h3>一键备份</h3>
+        <p>一个 <code>.wkarchive</code> 文件带走全部书架、进度与设置，换机只需一次导入。</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- 数字 -->
+  <section class="section stats">
+    <div class="stat reveal"><b>7</b><span>种导入格式</span></div>
+    <div class="stat reveal"><b>100%</b><span>数据留在本机</span></div>
+    <div class="stat reveal"><b>0</b><span>广告与账号</span></div>
+    <div class="stat reveal"><b>MIT</b><span>开源许可</span></div>
+  </section>
+
+  <!-- 下载 -->
+  <section class="section" id="download">
+    <div class="section-head">
+      <p class="eyebrow">DOWNLOAD</p>
+      <h2 class="section-title">选一个平台，开始阅读</h2>
+      <p class="section-desc">安装包由 GitHub Releases 直接分发，不经过任何第三方商店。</p>
+    </div>
+
+    <div class="download-grid">
+      <!-- Android -->
+      <article class="glass panel download-card">
+        <div class="dc-head">
+          <div class="dc-platform">
+            <svg viewBox="0 0 24 24" class="icon icon-lg" aria-hidden="true"><path d="M6.4 9.2h11.2v7.6a2 2 0 0 1-2 2H8.4a2 2 0 0 1-2-2z"/><path d="M9.2 9.2 7.4 4.6M14.8 9.2l1.8-4.6"/><circle cx="10" cy="12.6" r=".8"/><circle cx="14" cy="12.6" r=".8"/></svg>
+            <div>
+              <h3>Android 版</h3>
+              <p class="dc-tag">推荐 · 当前最新</p>
+            </div>
+          </div>
+          <span class="dc-ver">v1.0.3</span>
+        </div>
+
+        <ul class="dc-meta">
+          <li><span>文件大小</span><b>55.4 MB</b></li>
+          <li><span>更新时间</span><b>2026.11.22</b></li>
+          <li><span>适配系统</span><b>Android 7.0+</b></li>
+        </ul>
+
+        <a class="btn btn-primary btn-block" href="https://github.com/Maxwell9178/nakano-wenku-flutter/releases/download/1.0.3/app-release.apk">
+          <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M12 3v11.4M7.4 10.2 12 14.8l4.6-4.6M4.6 19.4h14.8"/></svg>
+          安装安卓版 v1.0.3
+        </a>
+        <p class="dc-hint">首次安装需在系统设置里允许「安装未知来源应用」。</p>
+
+        <button class="history-toggle" id="historyToggle" type="button" aria-expanded="false">
+          <span>安卓版历史版本</span>
+          <svg viewBox="0 0 24 24" class="icon caret" aria-hidden="true"><path d="M7 9.6 12 14.4l5-4.8"/></svg>
+        </button>
+        <ul class="history" id="history" hidden>
+          <li><span class="hv">1.0.2</span><span class="hs">55.0 MB · 2026.11.22</span><a href="https://github.com/Maxwell9178/nakano-wenku-flutter/releases/download/1.0.2/app-release.apk">下载</a></li>
+          <li><span class="hv">1.0.1</span><span class="hs">55.1 MB · 2026.11.21</span><a href="https://github.com/Maxwell9178/nakano-wenku-flutter/releases/download/1.0.1/app-release.apk">下载</a></li>
+          <li><span class="hv">1.0.0</span><span class="hs">52.7 MB · 2026.11.21</span><a href="https://github.com/Maxwell9178/nakano-wenku-flutter/releases/download/1.0.0/app-release.apk">下载</a></li>
+          <li class="history-all"><a href="https://github.com/Maxwell9178/nakano-wenku-flutter/releases" target="_blank" rel="noopener">在 GitHub 查看全部版本 →</a></li>
+        </ul>
+      </article>
+
+      <!-- iOS -->
+      <article class="glass panel download-card is-disabled">
+        <div class="dc-head">
+          <div class="dc-platform">
+            <svg viewBox="0 0 24 24" class="icon icon-lg" aria-hidden="true"><path d="M15.6 12.6c0-2 1.6-3 1.7-3.1-.9-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7-.6 0-1.6-.7-2.6-.7-1.3 0-2.6.8-3.3 2-1.4 2.4-.4 6 1 7.9.7 1 1.5 2.1 2.6 2 1-.1 1.4-.7 2.7-.7s1.6.7 2.7.7c1.1 0 1.8-1 2.5-2 .8-1.2 1.1-2.3 1.1-2.4-.1 0-2.4-.9-2.5-2.8Z"/><path d="M13.8 5.6c.6-.7 1-1.7.9-2.6-.9 0-1.9.6-2.5 1.3-.5.6-1 1.6-.9 2.5 1 .1 2-.5 2.5-1.2Z"/></svg>
+            <div>
+              <h3>iOS 版</h3>
+              <p class="dc-tag">开发中 · 暂未发布</p>
+            </div>
+          </div>
+          <span class="dc-ver dc-ver-off">敬请期待</span>
+        </div>
+
+        <ul class="dc-meta">
+          <li><span>文件大小</span><b>—</b></li>
+          <li><span>更新时间</span><b>—</b></li>
+          <li><span>适配系统</span><b>iOS 尚未支持</b></li>
+        </ul>
+
+        <button class="btn btn-disabled btn-block" id="iosBtn" type="button">暂未提供 iOS 版</button>
+        <p class="dc-hint">作者正在学习与准备中，上线后会第一时间在这里公布。</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- 支持 -->
+  <section class="section" id="support">
+    <div class="section-head">
+      <p class="eyebrow">SUPPORT</p>
+      <h2 class="section-title">如果它帮到了你</h2>
+      <p class="section-desc">完全免费，也没有任何付费点。喜欢的话，点个 Star 就是最大的鼓励。</p>
+    </div>
+
+    <div class="support-grid">
+      <article class="glass panel donate">
+        <div class="donate-text">
+          <h3>如果你对该项目感兴趣，可以请我喝杯咖啡吗？</h3>
+          <p>每一份支持都会被用在字体授权、测试设备与熬夜的那杯咖啡上。</p>
+        </div>
+        <button class="btn btn-glass donate-btn" id="donateBtn" type="button">
+          <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M4.6 8.4h12.2v7.2a3.2 3.2 0 0 1-3.2 3.2H7.8a3.2 3.2 0 0 1-3.2-3.2z"/><path d="M16.8 10h1.6a2.4 2.4 0 0 1 0 4.8h-1.6M7 5.2c0-.9 1-1.2 1-2.1M11 5.2c0-.9 1-1.2 1-2.1"/></svg>
+          请我喝咖啡
+        </button>
+      </article>
+
+      <article class="glass panel qq">
+        <div class="qq-text">
+          <h3>QQ 交流群</h3>
+          <p>遇到 BUG、想要新功能、或者只是想聊聊读过的小说，都欢迎进群。</p>
+        </div>
+        <div class="qq-row">
+          <code id="qqNumber">1126557550</code>
+          <button class="btn btn-glass btn-sm" id="copyQQ" type="button">复制群号</button>
+        </div>
+      </article>
+
+      <article class="glass panel links-panel">
+        <h3>找到这个项目</h3>
+        <a class="link-row" href="https://github.com/Maxwell9178/nakano-wenku-flutter" target="_blank" rel="noopener">
+          <span><b>项目仓库</b><em>nakano-wenku-flutter</em></span>
+          <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M9 5.4h9.6V15M18.6 5.4 6 18"/></svg>
+        </a>
+        <a class="link-row" href="https://github.com/Maxwell9178" target="_blank" rel="noopener">
+          <span><b>创作者主页</b><em>Maxwell9178</em></span>
+          <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M9 5.4h9.6V15M18.6 5.4 6 18"/></svg>
+        </a>
+        <a class="link-row" href="https://github.com/Maxwell9178/nakano-wenku-flutter/releases" target="_blank" rel="noopener">
+          <span><b>全部版本</b><em>Releases</em></span>
+          <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M9 5.4h9.6V15M18.6 5.4 6 18"/></svg>
+        </a>
+      </article>
+    </div>
+  </section>
+
+  <!-- 关于 -->
+  <section class="section" id="about">
+    <div class="section-head">
+      <p class="eyebrow">ABOUT</p>
+      <h2 class="section-title">一个初中生写的阅读器</h2>
+      <p class="section-desc">没有团队，没有融资，只有课余时间和一台笔记本。</p>
+    </div>
+
+    <div class="glass panel about-panel reveal">
+      <p>
+        NakanoWenku 由 Maxwell 独立设计与开发，用 Dart 与 Flutter 编写，目前仅支持 Android。
+        它诞生于一个很朴素的念头：市面上的阅读器要么绑定书源、要么把数据放到云端，
+        而我只想要一个「把文件放进去，就能安静读完」的工具。
+      </p>
+      <p>
+        所以它完全离线、不需要账号、不申请多余权限，数据永远留在你自己的设备上。
+        代码全部开源，你可以自己编译，也可以直接看它到底做了什么。
+      </p>
+      <p class="about-sign">MADE BY MAXWELL</p>
+    </div>
+  </section>
+
+</main>
+
+<!-- 页脚 -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <img src="assets/icon-192.png" alt="" />
+      <div>
+        <b>NakanoWenku</b>
+        <span>本地书架 · 离线阅读器</span>
+      </div>
+    </div>
+
+    <button class="notes-toggle" id="notesToggle" type="button" aria-expanded="false">
+      <span>附注 · 安全声明与技术说明</span>
+      <svg viewBox="0 0 24 24" class="icon caret" aria-hidden="true"><path d="M7 9.6 12 14.4l5-4.8"/></svg>
+    </button>
+
+    <div class="notes" id="notes" hidden>
+      <details class="note-item" data-src="assets/texts/safety.txt">
+        <summary>安全声明与用户风险告知书</summary>
+        <div class="note-body"><p class="loading">正在读取……</p></div>
+      </details>
+      <details class="note-item" data-src="assets/texts/tech.txt">
+        <summary>技术说明</summary>
+        <div class="note-body"><p class="loading">正在读取……</p></div>
+      </details>
+      <details class="note-item" data-src="assets/texts/author.txt">
+        <summary>作者的话</summary>
+        <div class="note-body"><p class="loading">正在读取……</p></div>
+      </details>
+      <details class="note-item" data-src="assets/texts/quotes.txt">
+        <summary>名言名句收录</summary>
+        <div class="note-body"><p class="loading">正在读取……</p></div>
+      </details>
+    </div>
+
+    <p class="footer-copy">© 2026 Maxwell9178 · 本项目仅供个人学习交流，免费开源，不用于商用。</p>
+  </div>
+</footer>
+
+<!-- 模态：iOS -->
+<div class="modal" id="iosModal" hidden>
+  <div class="modal-mask" data-close></div>
+  <div class="modal-card glass" role="dialog" aria-modal="true" aria-labelledby="iosTitle">
+    <p class="eyebrow">NOT AVAILABLE</p>
+    <h3 id="iosTitle">暂不支持 iOS 版</h3>
+    <p class="modal-desc">目前只完成了 Android 版本，iOS 版本还没有开发。上线后会在本页与 GitHub 同步公布。</p>
+    <button class="btn btn-primary btn-block" data-close type="button">知道了</button>
+  </div>
+</div>
+
+<!-- 模态：打赏码 -->
+<div class="modal" id="donateModal" hidden>
+  <div class="modal-mask" data-close></div>
+  <div class="modal-card glass donate-card" role="dialog" aria-modal="true" aria-labelledby="donateTitle">
+    <p class="eyebrow">THANK YOU</p>
+    <h3 id="donateTitle">请喝一杯咖啡</h3>
+    <p class="modal-desc">扫码即可，金额随意。你的名字会被记在这个项目的感谢名单里。</p>
+    <img class="donate-qr" src="assets/donate.jpg" alt="微信收款码" />
+    <div class="modal-actions">
+      <a class="btn btn-glass" href="assets/donate.jpg" download="nakano-wenku-donate.jpg">保存收款码</a>
+      <button class="btn btn-primary" data-close type="button">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="assets/main.js"></script>
+</body>
+</html>
