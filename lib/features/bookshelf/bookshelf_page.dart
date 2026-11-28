@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/routing/app_routes.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/models/book.dart';
 import '../../core/services/book_repository.dart';
 import '../../core/theme/app_colors.dart';
@@ -69,7 +70,10 @@ class _BookshelfPageState extends State<BookshelfPage> {
           builder: (BuildContext context, Widget? child) {
             return Column(
               children: <Widget>[
-                AppTopBar(trailing: _buildImportButton(context)),
+                AppTopBar(
+                  leading: _buildAppIcon(),
+                  trailing: _buildImportButton(context),
+                ),
                 Expanded(
                   child: controller.hasBooks
                       ? _buildShelf(context, controller)
@@ -213,6 +217,19 @@ class _BookshelfPageState extends State<BookshelfPage> {
   }
 
   // ---------------- 右上角导入入口 ----------------
+
+  /// 左上角应用图标：1:1 圆角小图，不用原来那张方形图标。
+  Widget _buildAppIcon() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(9),
+      child: Image.asset(
+        AppConstants.appIconAsset,
+        width: 30,
+        height: 30,
+        fit: BoxFit.cover,
+      ),
+    );
+  }
 
   Widget _buildImportButton(BuildContext context) {
     final Brightness brightness = Theme.of(context).brightness;

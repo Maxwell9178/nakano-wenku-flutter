@@ -29,6 +29,9 @@ class StorageKeys {
   static const String glassBlur = 'nw.settings.glassBlur';
 
   /// 毛玻璃透明度：0~100。
+  /// 液态效果强度（0~100）。
+  static const String liquidLevel = 'nw.settings.liquidLevel';
+
   static const String glassOpacity = 'nw.settings.glassOpacity';
 
   /// 边框粗细档位：none / thin / thick。
@@ -72,6 +75,9 @@ class StorageKeys {
   static const String excerpts = 'nw.reading.excerpts';
 
   /// 书签库（JSON 数组，按书 + 章节位置存储，与阅读进度互不影响）。
+  /// 按章节记录的阅读位置：{书号: {章序号: 章内比例}}。
+  static const String chapterPositions = 'nw.reading.chapterPositions';
+
   static const String bookmarks = 'nw.reading.bookmarks';
 
   /// 批注库（JSON 数组，原文片段 + 用户批注）。
@@ -85,6 +91,10 @@ class StorageKeys {
   static const String readingTotalSeconds = 'nw.stats.readingTotalSeconds';
 
   /// 阅读标签权重（JSON 对象：标签 → 分值），雷达图数据源。
+  /// 自定义标签与已被删除的系统标签。
+  static const String customTags = 'nw.tags.custom';
+  static const String removedTags = 'nw.tags.removed';
+
   static const String tagScores = 'nw.stats.tagScores';
 
   // ---------------- 版本更新 ----------------

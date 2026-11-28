@@ -79,6 +79,9 @@ class LiquidGlass extends StatelessWidget {
     final double fillOpacity =
         (opacity ?? spec.liquidTintOpacity).clamp(0.0, 1.0).toDouble();
     final double stroke = sheen ? (borderWidth ?? spec.borderWidth) : 0.0;
+    // 液态强度：0 时只剩一层平面玻璃，越大边缘折射与液面反光越明显。
+    final double intensity =
+        (sheen ? spec.liquidLevel : 0.0).clamp(0.0, 1.0).toDouble();
 
     final BorderRadius radius = BorderRadius.circular(borderRadius);
     final Color baseTint = tint ?? AppColors.glassTint(brightness);
@@ -116,18 +119,19 @@ class LiquidGlass extends StatelessWidget {
           ),
 
           // 3. 边缘折射：沿内缘再糊一层，背景在边框附近被「放大」的错觉
-          if (sheen && sigma > 0.4)
+          if (sheen && sigma > 0.4 && intensity > 0.02)
             Positioned.fill(
               child: IgnorePointer(
                 child: ClipPath(
                   clipper: _GlassEdgeBandClipper(
                     radius: borderRadius,
-                    bandWidth: (borderRadius * 0.22).clamp(5.0, 16.0),
+                    bandWidth: (borderRadius * 0.22).clamp(5.0, 16.0) *
+                        (0.45 + 1.05 * intensity),
                   ),
                   child: BackdropFilter(
                     filter: ui.ImageFilter.blur(
-                      sigmaX: sigma * 1.9,
-                      sigmaY: sigma * 1.9,
+                      sigmaX: sigma * (1.05 + 1.7 * intensity),
+                      sigmaY: sigma * (1.05 + 1.7 * intensity),
                     ),
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -158,14 +162,22 @@ class LiquidGlass extends StatelessWidget {
             ),
 
           // 4. 液态反光：光团 + 流动光带 + 月牙镜面
-          if (sheen)
+          //
+          // 强度来自设置里的「液态效果」，线性映射到这一层的可见度：
+          // 每挪动一点滑块，反光和边缘的厚度都会跟着变。
+          if (sheen && intensity > 0.02)
             Positioned.fill(
               child: IgnorePointer(
-                child: CustomPaint(
-                  painter: _LiquidSheenPainter(
-                    isDark: isDark,
-                    accent: baseTint,
-                    cornerRadius: borderRadius,
+                child: Opacity(
+                  opacity: (0.25 + 0.75 * intensity).clamp(0.0, 1.0),
+                  child: CustomPaint(
+                    painter: _LiquidSheenPainter(
+                      isDark: isDark,
+                      // 反光永远用中性白/黑，不掺装饰色，
+                      // 避免玻璃边缘被染色成「金边/黄边」。
+                      accent: isDark ? Colors.white : Colors.black,
+                      cornerRadius: borderRadius,
+                    ),
                   ),
                 ),
               ),

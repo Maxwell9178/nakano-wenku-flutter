@@ -10,6 +10,7 @@ import '../../core/services/book_repository.dart';
 import '../../core/services/chapter_repository.dart';
 import '../../core/services/excerpt_repository.dart';
 import '../../core/services/quote_repository.dart';
+import '../../core/services/reading_position_repository.dart';
 import '../../core/services/reading_preferences_repository.dart';
 
 /// 阅读页的数据与状态中枢。
@@ -25,6 +26,7 @@ class ReaderController extends ChangeNotifier {
     required ReadingPreferencesRepository preferencesRepository,
     required ExcerptRepository excerptRepository,
     required QuoteRepository quoteRepository,
+    required ReadingPositionRepository positions,
     required Book book,
     required int initialChapterIndex,
   })  : _books = books,
@@ -32,6 +34,7 @@ class ReaderController extends ChangeNotifier {
         _preferencesRepository = preferencesRepository,
         _excerptRepository = excerptRepository,
         _quoteRepository = quoteRepository,
+        _positions = positions,
         _book = book,
         _initialChapterIndex = initialChapterIndex;
 
@@ -40,6 +43,7 @@ class ReaderController extends ChangeNotifier {
   final ReadingPreferencesRepository _preferencesRepository;
   final ExcerptRepository _excerptRepository;
   final QuoteRepository _quoteRepository;
+  final ReadingPositionRepository _positions;
 
   Book _book;
   final int _initialChapterIndex;
@@ -54,6 +58,9 @@ class ReaderController extends ChangeNotifier {
   int _currentChapter = 0;
   double _progress = 0;
   bool _loading = true;
+
+  /// 每一章读到的位置（章内比例 0~1），用于「从目录进入也回到原处」。
+  Map<int, double> _chapterPositions = <int, double>{};
 
   Timer? _persistTimer;
 
@@ -91,6 +98,23 @@ class ReaderController extends ChangeNotifier {
     return (_progress.clamp(0.0, 1.0) * 100).round().clamp(0, 100);
   }
 
+  /// 某一章上次读到的章内比例；没有记录返回 null。
+  double? chapterPosition(int chapter) => _chapterPositions[chapter];
+
+  /// 记录某一章读到的位置（异步落盘，不触发重建）。
+  void recordChapterPosition(int chapter, double ratio) {
+    if (chapter < 0) {
+      return;
+    }
+    final double safe = ratio.clamp(0.0, 1.0).toDouble();
+    final double? previous = _chapterPositions[chapter];
+    if (previous != null && (previous - safe).abs() < 0.01) {
+      return;
+    }
+    _chapterPositions[chapter] = safe;
+    unawaited(_positions.save(_book.number, chapter, safe));
+  }
+
   /// 精确进度（0~1），续读定位与进度条共用。
   double get progress => _progress.clamp(0.0, 1.0).toDouble();
 
@@ -117,6 +141,12 @@ class ReaderController extends ChangeNotifier {
       _chapters = await _chapterRepository.load(_book.number);
     } catch (_) {
       _chapters = <Chapter>[];
+    }
+
+    try {
+      _chapterPositions = await _positions.loadForBook(_book.number);
+    } catch (_) {
+      _chapterPositions = <int, double>{};
     }
 
     _currentChapter = _resolveInitialChapter();

@@ -204,6 +204,7 @@ class GlassSpec {
     required this.liquidTintOpacity,
     required this.panelOpacity,
     required this.borderWidth,
+    required this.liquidLevel,
   });
 
   /// BackdropFilter 的高斯模糊强度。
@@ -217,6 +218,9 @@ class GlassSpec {
 
   /// 边框线宽。
   final double borderWidth;
+
+  /// 液态效果强度（0~1）：控制反光、边缘折射与镜面的存在感。
+  final double liquidLevel;
 
   bool get hasBlur => blurSigma > 0.4;
 
@@ -238,6 +242,7 @@ class AppSettingsController extends ChangeNotifier {
   static const ThemeMode _defaultThemeMode = ThemeMode.system;
   static const int _defaultGlassBlur = 58;
   static const int _defaultGlassOpacity = 42;
+  static const int _defaultLiquidLevel = 62;
   static const GlassBorderLevel _defaultBorder = GlassBorderLevel.thin;
   static const ReadingFontMode _defaultFontMode = ReadingFontMode.system;
   static const DecorationTone _defaultDecorationTone = DecorationTone.none;
@@ -276,6 +281,7 @@ class AppSettingsController extends ChangeNotifier {
   ThemeMode _themeMode = _defaultThemeMode;
   int _glassBlur = _defaultGlassBlur;
   int _glassOpacity = _defaultGlassOpacity;
+  int _liquidLevel = _defaultLiquidLevel;
   GlassBorderLevel _glassBorder = _defaultBorder;
   ReadingFontMode _readingFontMode = _defaultFontMode;
   DecorationTone _decorationTone = _defaultDecorationTone;
@@ -289,6 +295,12 @@ class AppSettingsController extends ChangeNotifier {
 
   /// 毛玻璃模糊程度 0~100。
   int get glassBlur => _glassBlur;
+
+  /// 毛玻璃是否开启模糊（两档：模糊 / 不模糊）。
+  bool get glassBlurEnabled => _glassBlur > 0;
+
+  /// 液态效果强度 0~100。
+  int get liquidLevel => _liquidLevel;
 
   /// 毛玻璃透明度 0~100。
   int get glassOpacity => _glassOpacity;
@@ -326,13 +338,14 @@ class AppSettingsController extends ChangeNotifier {
     return GlassSpec(
       // 1~30 sigma：低端保留一点雾感，高端真正糊开；
       // 用平方根曲线让滑块前半段也能看到明显变化。
-      blurSigma: 1 + 29 * _sqrtCurve(blurRatio),
+      blurSigma: _glassBlur <= 0 ? 0 : 2 + 24 * _sqrtCurve(blurRatio),
       // 液态玻璃 0~100 对应 4%~46% 底色。
       liquidTintOpacity: 0.04 + opacityRatio * 0.42,
       // 毛玻璃面板 0~100 对应 6%~72%：整条轴都有连续的浓淡变化，
       // 不会在 1/3 处就变成纯色。
       panelOpacity: 0.06 + opacityRatio * 0.66,
       borderWidth: _glassBorder.strokeWidth,
+      liquidLevel: _liquidLevel.clamp(0, 100) / 100,
     );
   }
 
@@ -355,6 +368,10 @@ class AppSettingsController extends ChangeNotifier {
         .toInt();
     _glassOpacity = _storage
         .getInt(StorageKeys.glassOpacity, fallback: _defaultGlassOpacity)
+        .clamp(0, 100)
+        .toInt();
+    _liquidLevel = _storage
+        .getInt(StorageKeys.liquidLevel, fallback: _defaultLiquidLevel)
         .clamp(0, 100)
         .toInt();
     _glassBorder = glassBorderLevelFromStorage(
@@ -404,6 +421,21 @@ class AppSettingsController extends ChangeNotifier {
     _glassBlur = safe;
     notifyListeners();
     await _storage.setInt(StorageKeys.glassBlur, safe);
+  }
+
+  /// 毛玻璃模糊只保留两档：开 = 58（标准雾面），关 = 0（完全不糊）。
+  Future<void> setGlassBlurEnabled(bool enabled) async {
+    await setGlassBlur(enabled ? _defaultGlassBlur : 0);
+  }
+
+  Future<void> setLiquidLevel(int value) async {
+    final int safe = value.clamp(0, 100).toInt();
+    if (_liquidLevel == safe) {
+      return;
+    }
+    _liquidLevel = safe;
+    notifyListeners();
+    await _storage.setInt(StorageKeys.liquidLevel, safe);
   }
 
   Future<void> setGlassOpacity(int value) async {
@@ -485,6 +517,7 @@ class AppSettingsController extends ChangeNotifier {
     _themeMode = ThemeMode.system;
     _glassBlur = _defaultGlassBlur;
     _glassOpacity = _defaultGlassOpacity;
+    _liquidLevel = _defaultLiquidLevel;
     _glassBorder = GlassBorderLevel.thin;
     _readingFontMode = _defaultFontMode;
     _decorationTone = _defaultDecorationTone;
@@ -501,6 +534,7 @@ class AppSettingsController extends ChangeNotifier {
     );
     await _storage.setInt(StorageKeys.glassBlur, _glassBlur);
     await _storage.setInt(StorageKeys.glassOpacity, _glassOpacity);
+    await _storage.setInt(StorageKeys.liquidLevel, _liquidLevel);
     await _storage.setString(StorageKeys.glassBorder, _glassBorder.name);
     await _storage.setString(
       StorageKeys.readingFontMode,

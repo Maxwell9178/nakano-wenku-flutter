@@ -8,6 +8,7 @@ import '../../core/models/import_site.dart';
 import '../../core/services/book_import_service.dart';
 import '../../core/services/import_site_repository.dart';
 import '../../core/services/local_file_scanner.dart';
+import '../../core/services/tag_repository.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/feedback.dart';
@@ -826,6 +827,195 @@ class _ImportPageState extends State<ImportPage> {
     );
   }
 
+  /// 调整「自选合并」的卷顺序；返回 null 表示用户取消。
+  Future<List<int>?> _askMergeOrder(ImportPlan plan, Set<int> selection) async {
+    final Brightness brightness = Theme.of(context).brightness;
+    final List<int> order = plan.volumes
+        .where(
+            (ImportedVolume volume) => selection.contains(volume.sourceIndex))
+        .map((ImportedVolume volume) => volume.sourceIndex)
+        .toList();
+    final Map<int, String> labels = <int, String>{
+      for (final ImportedVolume volume in plan.volumes)
+        volume.sourceIndex: volume.sourceLabel,
+    };
+
+    final List<int>? result = await showGlassDialog<List<int>>(
+      context: context,
+      builder: (BuildContext context) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setLocal) {
+          return GlassDialogCard(
+            title: '调整合并顺序',
+            english: 'MERGE ORDER',
+            message: '用上下箭头把卷排成正文的先后顺序，合并后章节就按这个顺序拼接。',
+            content: SizedBox(
+              height: 240,
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                itemCount: order.length,
+                separatorBuilder: (BuildContext context, int index) =>
+                    const SizedBox(height: 6),
+                itemBuilder: (BuildContext context, int index) {
+                  final int sourceIndex = order[index];
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.divider(brightness),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Row(
+                      children: <Widget>[
+                        Text(
+                          '${index + 1}',
+                          style: TextStyle(
+                            fontFamily: AppFonts.serif,
+                            fontSize: 12,
+                            color: AppColors.textTertiary(brightness),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            labels[sourceIndex] ?? '第 $sourceIndex 卷',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textPrimary(brightness),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          iconSize: 16,
+                          splashRadius: 16,
+                          onPressed: index == 0
+                              ? null
+                              : () => setLocal(() {
+                                    final int moved = order.removeAt(index);
+                                    order.insert(index - 1, moved);
+                                  }),
+                          icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          iconSize: 16,
+                          splashRadius: 16,
+                          onPressed: index == order.length - 1
+                              ? null
+                              : () => setLocal(() {
+                                    final int moved = order.removeAt(index);
+                                    order.insert(index + 1, moved);
+                                  }),
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            actions: <Widget>[
+              GlassDialogButton(
+                label: '按这个顺序合并',
+                primary: true,
+                onTap: () => Navigator.of(context).pop(order),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    return result;
+  }
+
+  /// 导入前挑标签（最多两个，可不选）。
+  Future<List<String>> _askImportTags() async {
+    final Brightness brightness = Theme.of(context).brightness;
+    final TagRepository repo = context.read<TagRepository>();
+    final List<String> pool = repo.effectiveTags;
+    if (pool.isEmpty) {
+      return const <String>[];
+    }
+    final List<String> chosen = <String>[];
+
+    final List<String>? result = await showGlassDialog<List<String>>(
+      context: context,
+      builder: (BuildContext context) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setLocal) {
+          return GlassDialogCard(
+            title: '给这批书选标签',
+            english: 'TAGS',
+            message: '最多选 ${TagRepository.maxTagsPerBook} 个，之后也可以单独改；不选直接继续。',
+            content: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                for (final String tag in pool)
+                  GestureDetector(
+                    onTap: () => setLocal(() {
+                      if (chosen.contains(tag)) {
+                        chosen.remove(tag);
+                      } else if (chosen.length < TagRepository.maxTagsPerBook) {
+                        chosen.add(tag);
+                      } else {
+                        showSoftMessage(
+                          context,
+                          '最多选 ${TagRepository.maxTagsPerBook} 个标签',
+                        );
+                      }
+                    }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        color: chosen.contains(tag)
+                            ? AppColors.alpha(
+                                AppColors.textPrimary(brightness),
+                                0.90,
+                              )
+                            : null,
+                        border: Border.all(
+                          color: AppColors.divider(brightness),
+                          width: 0.9,
+                        ),
+                      ),
+                      child: Text(
+                        tag,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: chosen.contains(tag)
+                              ? AppColors.background(brightness)
+                              : AppColors.textPrimary(brightness),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            actions: <Widget>[
+              GlassDialogButton(
+                label: '继续',
+                primary: true,
+                onTap: () => Navigator.of(context).pop(List<String>.of(chosen)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    return result ?? const <String>[];
+  }
+
   Future<void> _startImport() async {
     final ImportPlan? plan = await _c.prepareSelected();
     if (plan == null || !mounted) {
@@ -857,6 +1047,25 @@ class _ImportPageState extends State<ImportPage> {
       mergeSelection = choice.selection;
     }
 
+    // 自选合并：允许调整合并进同一本书的卷顺序（文件夹里卷序常常是乱的）。
+    List<int>? mergeOrder;
+    if (mode == VolumeImportMode.mergeSelected && mergeSelection.length > 1) {
+      mergeOrder = await _askMergeOrder(plan, mergeSelection);
+      if (!mounted) {
+        return;
+      }
+      if (mergeOrder == null) {
+        _c.cancelImport();
+        return;
+      }
+    }
+
+    // 导入时直接给这批书选标签，省得之后一本本补。
+    final List<String> pickedTags = await _askImportTags();
+    if (!mounted) {
+      return;
+    }
+
     final String? group = await showTextInputDialog(
       context: context,
       title: '分组标签',
@@ -879,6 +1088,8 @@ class _ImportPageState extends State<ImportPage> {
       mode: mode,
       mergeSelection: mergeSelection,
       group: _c.lastGroup,
+      mergeOrder: mergeOrder,
+      tags: pickedTags,
     );
     if (!mounted || outcome == null) {
       return;

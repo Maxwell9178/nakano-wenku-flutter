@@ -20,13 +20,29 @@ class ImportSiteRepository {
     url: 'https://github.com/Maxwell9178/nakano-wenku-flutter',
   );
 
+  /// 官方网站（GitHub Pages 上的项目主页）。
+  static const ImportSite officialSite = ImportSite(
+    id: 'default-official',
+    name: '官方网站',
+    url: 'https://maxwell9178.github.io/',
+  );
+
+  static const List<ImportSite> bundledSites = <ImportSite>[
+    defaultSite,
+    officialSite,
+  ];
+
   List<ImportSite> load() {
     final List<ImportSite> sites = _loadRaw();
-    // 老版本存过别的默认站点，这里补上 GitHub 入口但不覆盖用户自己的配置。
-    if (!sites.any((ImportSite site) => site.id == defaultSite.id)) {
-      return <ImportSite>[defaultSite, ...sites];
+    // 老版本存过别的默认站点：把内置入口补齐到最前面，但不覆盖用户自己的配置。
+    final List<ImportSite> missing = bundledSites
+        .where((ImportSite site) =>
+            !sites.any((ImportSite item) => item.id == site.id))
+        .toList();
+    if (missing.isEmpty) {
+      return sites;
     }
-    return sites;
+    return <ImportSite>[...missing, ...sites];
   }
 
   List<ImportSite> _loadRaw() {

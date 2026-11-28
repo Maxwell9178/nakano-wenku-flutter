@@ -235,16 +235,42 @@ class _SettingsPageState extends State<SettingsPage> {
               const SizedBox(height: 18),
               _SettingLabel(
                 title: '毛玻璃模糊',
-                english: 'BLUR ${settings.glassBlur}',
+                english: settings.glassBlurEnabled ? 'BLUR ON' : 'BLUR OFF',
+                brightness: brightness,
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: <Widget>[
+                  _ChoiceChip(
+                    label: '模糊',
+                    selected: settings.glassBlurEnabled,
+                    onTap: () => settings.setGlassBlurEnabled(true),
+                    accent: accent,
+                    brightness: brightness,
+                  ),
+                  const SizedBox(width: 8),
+                  _ChoiceChip(
+                    label: '不模糊',
+                    selected: !settings.glassBlurEnabled,
+                    onTap: () => settings.setGlassBlurEnabled(false),
+                    accent: accent,
+                    brightness: brightness,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              _SettingLabel(
+                title: '液态效果',
+                english: 'LIQUID ${settings.liquidLevel}',
                 brightness: brightness,
               ),
               const SizedBox(height: 4),
               _SliderRow(
-                value: settings.glassBlur.toDouble(),
+                value: settings.liquidLevel.toDouble(),
                 min: 0,
                 max: 100,
                 onChanged: (double value) =>
-                    settings.setGlassBlur(value.round()),
+                    settings.setLiquidLevel(value.round()),
                 accent: accent,
               ),
               const SizedBox(height: 10),
@@ -413,7 +439,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'BLUR ${settings.glassBlur} · OPACITY ${settings.glassOpacity}',
+                          'BLUR ${settings.glassBlurEnabled ? 'ON' : 'OFF'} · OPACITY ${settings.glassOpacity} · LIQUID ${settings.liquidLevel}',
                           style: AppTypography.englishLabel(
                             brightness,
                             fontSize: 8.2,

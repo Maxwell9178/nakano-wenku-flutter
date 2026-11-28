@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/models/book.dart';
+import '../../core/services/tag_repository.dart';
 import '../../core/models/chapter.dart';
 import '../../core/services/book_repository.dart';
 import '../../core/services/chapter_repository.dart';
@@ -186,6 +187,9 @@ class BookDetailController extends ChangeNotifier {
     }
     if (_book.tags.contains(tag)) {
       return '这本书已经有「$tag」标签了';
+    }
+    if (_book.tags.length >= TagRepository.maxTagsPerBook) {
+      return '每本书最多 ${TagRepository.maxTagsPerBook} 个标签，先去掉一个吧';
     }
     _book = _book.copyWith(tags: <String>[..._book.tags, tag]);
     await _persist();

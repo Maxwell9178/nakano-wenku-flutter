@@ -342,8 +342,7 @@ class _ModeChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
               color: AppColors.alpha(
-                  AppColors.textSecondary(Theme.of(context).brightness),
-                  0.55),
+                  AppColors.textSecondary(Theme.of(context).brightness), 0.55),
               width: 0.8),
         ),
         child: Text(

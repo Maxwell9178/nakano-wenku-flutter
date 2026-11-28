@@ -412,6 +412,36 @@ class UpdateService {
   }
 
   /// 打开系统的「安装未知应用」授权页。
+  /// 只下载、不安装：给「下载窗口 + 开始更新」两步式界面用。
+  Future<String?> downloadApk(
+    AppVersionInfo info, {
+    void Function(double progress)? onProgress,
+  }) async {
+    final List<String> candidates = <String>[
+      if (info.downloadUrl.isNotEmpty) info.downloadUrl,
+      AppConstants.updateApkUrl,
+      ...AppConstants.updateApkFallbackUrls,
+    ];
+    lastError = null;
+    for (final String url in candidates) {
+      final Uri? uri = Uri.tryParse(url);
+      if (uri == null) {
+        continue;
+      }
+      final String? saved = await _downloadApk(uri, info, onProgress);
+      if (saved != null) {
+        return saved;
+      }
+    }
+    return null;
+  }
+
+  /// 是否可以应用内安装（已被授予「安装未知应用」）。
+  Future<bool> canInstallPackage() => _installer.canInstall();
+
+  /// 用原生 FileProvider 通道把已经下好的 APK 交给系统安装器。
+  Future<ApkInstallResult> installApk(String path) => _installer.install(path);
+
   Future<bool> openInstallSettings() => _installer.openInstallSettings();
 
   /// 把 APK 下载到日志目录下的 `updates/` 里，返回本地路径。

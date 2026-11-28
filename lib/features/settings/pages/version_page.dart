@@ -103,33 +103,19 @@ class _VersionPageState extends State<VersionPage> {
       return;
     }
 
-    // 下载期间用进度卡片占位，避免用户重复点击，也让 55MB 的等待有反馈。
-    final ValueNotifier<double> progress = ValueNotifier<double>(0);
-    final NavigatorState navigator = Navigator.of(context, rootNavigator: true);
-    bool dialogOpen = true;
-    showDialog<void>(
+    // 两步式：先看下载窗口（进度 + 完成后「开始更新」），再交给系统安装器。
+    final _UpdateDownloadResult? result =
+        await showDialog<_UpdateDownloadResult>(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext ctx) => _DownloadProgressDialog(
-        progress: progress,
-        versionName: info.versionName,
-      ),
-    ).then((_) => dialogOpen = false);
-
-    final ApkInstallResult result = await service.downloadAndInstall(
-      info,
-      onProgress: (double value) => progress.value = value,
+      builder: (BuildContext ctx) =>
+          _UpdateDownloadDialog(service: service, info: info),
     );
-    if (dialogOpen) {
-      navigator.pop();
-      dialogOpen = false;
-    }
-    progress.dispose();
-    if (!mounted) {
+    if (!mounted || result == null) {
       return;
     }
 
-    switch (result) {
+    switch (result.install) {
       case ApkInstallResult.launched:
         // 系统安装界面已经弹出，后续交给系统处理。
         return;
@@ -138,13 +124,12 @@ class _VersionPageState extends State<VersionPage> {
         return;
       case ApkInstallResult.missingFile:
         showSoftMessage(context, '安装包已被系统清理，请重新下载');
-        break;
+        return;
       case ApkInstallResult.unsupported:
       case ApkInstallResult.failed:
         break;
     }
 
-    // 应用内安装不可用时，最后回落到浏览器下载页（仍然可以完成升级）。
     final bool opened = await service.openDownload(info);
     if (!mounted) {
       return;
@@ -550,82 +535,161 @@ class _InfoRow extends StatelessWidget {
 ///
 /// 只显示进度，不允许中途关闭（避免下到一半的 APK 被误用），
 /// 下载完成后由调用方立即 pop 并拉起系统安装器。
-class _DownloadProgressDialog extends StatelessWidget {
-  const _DownloadProgressDialog({
-    required this.progress,
-    required this.versionName,
-  });
+/// 「下载窗口 + 开始更新」的两步式更新对话框。
+///
+/// 第一步只下载（显示百分比与体积），第二步由用户点「开始更新」，
+/// 再把 APK 通过 FileProvider 交给系统安装器 —— 避免以为点了就装上、
+/// 实际什么都没发生。
+class _UpdateDownloadResult {
+  const _UpdateDownloadResult(this.install);
 
-  final ValueNotifier<double> progress;
-  final String versionName;
+  final ApkInstallResult install;
+}
+
+class _UpdateDownloadDialog extends StatefulWidget {
+  const _UpdateDownloadDialog({required this.service, required this.info});
+
+  final UpdateService service;
+  final AppVersionInfo info;
+
+  @override
+  State<_UpdateDownloadDialog> createState() => _UpdateDownloadDialogState();
+}
+
+class _UpdateDownloadDialogState extends State<_UpdateDownloadDialog> {
+  double _progress = 0;
+  String? _path;
+  String? _error;
+  bool _installing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  Future<void> _start() async {
+    final String? path = await widget.service.downloadApk(
+      widget.info,
+      onProgress: (double value) {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _progress = value);
+      },
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _path = path;
+      _error = path == null ? '下载失败，请检查网络或稍后再试' : null;
+      _progress = path == null ? _progress : 1;
+    });
+  }
+
+  Future<void> _install() async {
+    final String? path = _path;
+    if (path == null || _installing) {
+      return;
+    }
+    setState(() => _installing = true);
+    final ApkInstallResult result = await widget.service.installApk(path);
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pop(_UpdateDownloadResult(result));
+  }
 
   @override
   Widget build(BuildContext context) {
     final Brightness brightness = Theme.of(context).brightness;
     final Color accent = AppColors.accent(brightness);
+    final bool ready = _path != null;
+    final int percent = (_progress * 100).round().clamp(0, 100);
 
     return Center(
       child: LiquidGlass(
         borderRadius: 24,
-        padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
+        padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
         child: SizedBox(
-          width: 232,
+          width: 250,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               Text(
-                '正在下载 v$versionName',
+                ready ? '下载完成' : '正在下载 v${widget.info.versionName}',
                 style: AppTypography.chineseTitle(brightness, fontSize: 17),
               ),
               const SizedBox(height: 4),
               Text(
-                'DOWNLOADING',
+                ready ? 'READY TO INSTALL' : 'DOWNLOADING',
                 style: TextStyle(
                   fontSize: 8.4,
                   letterSpacing: 2.2,
                   color: AppColors.textTertiary(brightness),
                 ),
               ),
-              const SizedBox(height: 18),
-              ValueListenableBuilder<double>(
-                valueListenable: progress,
-                builder: (BuildContext context, double value, Widget? child) {
-                  final int percent = (value * 100).clamp(0, 100).round();
-                  return Column(
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: SizedBox(
+                  height: 6,
+                  child: Stack(
                     children: <Widget>[
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(999),
-                        child: SizedBox(
-                          height: 4,
-                          child: Stack(
-                            children: <Widget>[
-                              Positioned.fill(
-                                child: ColoredBox(
-                                  color: AppColors.alpha(accent, 0.14),
-                                ),
-                              ),
-                              FractionallySizedBox(
-                                widthFactor: value.clamp(0.0, 1.0),
-                                child: ColoredBox(
-                                  color: AppColors.alpha(accent, 0.85),
-                                ),
-                              ),
-                            ],
-                          ),
+                      Positioned.fill(
+                        child: ColoredBox(
+                          color: AppColors.alpha(accent, 0.14),
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '$percent%',
-                        style: TextStyle(
-                          fontSize: 11,
-                          letterSpacing: 1.2,
-                          color: AppColors.textSecondary(brightness),
+                      FractionallySizedBox(
+                        widthFactor: _progress.clamp(0.0, 1.0),
+                        child: ColoredBox(
+                          color: AppColors.alpha(accent, 0.85),
                         ),
                       ),
                     ],
-                  );
-                },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _error == null ? '$percent%' : _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: _error == null ? 11 : 10.5,
+                  letterSpacing: _error == null ? 1.2 : 0.2,
+                  height: 1.5,
+                  color: AppColors.textSecondary(brightness),
+                ),
+              ),
+              const SizedBox(height: 18),
+              if (ready)
+                GhostButton(
+                  label: _installing ? '正在唤起安装…' : '开始更新',
+                  english: 'INSTALL',
+                  icon: Icons.system_update_alt_rounded,
+                  expand: true,
+                  onTap: _installing ? null : _install,
+                )
+              else
+                GhostButton(
+                  label: '取消',
+                  english: 'CANCEL',
+                  expand: true,
+                  onTap: () => Navigator.of(context).pop(),
+                ),
+              const SizedBox(height: 8),
+              Text(
+                ready
+                    ? '点「开始更新」后会弹出系统安装界面，按提示确认即可。'
+                    : '安装包会先下载到应用缓存，不会在后台自动安装。',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 9.2,
+                  height: 1.6,
+                  color: AppColors.textTertiary(brightness),
+                ),
               ),
             ],
           ),

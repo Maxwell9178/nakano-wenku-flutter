@@ -235,12 +235,16 @@ class ImportController extends ChangeNotifier {
     required VolumeImportMode mode,
     Set<int> mergeSelection = const <int>{},
     String? group,
+    List<int>? mergeOrder,
+    List<String> tags = const <String>[],
   }) async {
     final ImportOutcome outcome = await _importService.commit(
       plan,
       mode: mode,
       mergeSelection: mergeSelection,
       groupLabel: group,
+      mergeOrder: mergeOrder,
+      tags: tags,
       onProgress: _handleProgress,
     );
     _failures = outcome.failures;

@@ -11,10 +11,13 @@ import 'thin_divider.dart';
 /// 第一轮修正：署名不再与标题挤在同一行（避免被右侧截断），
 /// 分割线改用可见的浅灰色。
 class AppTopBar extends StatelessWidget {
-  const AppTopBar({super.key, this.trailing, this.padding});
+  const AppTopBar({super.key, this.trailing, this.padding, this.leading});
 
   /// 右侧可选操作（例如导入入口）。
   final Widget? trailing;
+
+  /// 左侧可选图标（书架主页放应用图标）。
+  final Widget? leading;
 
   final EdgeInsetsGeometry? padding;
 
@@ -34,6 +37,10 @@ class AppTopBar extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
+              if (leading != null) ...<Widget>[
+                leading!,
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

@@ -6,6 +6,7 @@ import 'backup_import_service.dart';
 import 'book_import_service.dart';
 import 'book_repository.dart';
 import 'bookmark_repository.dart';
+import 'reading_position_repository.dart';
 import 'chapter_repository.dart';
 import 'custom_font_service.dart';
 import 'excerpt_repository.dart';
@@ -16,6 +17,7 @@ import 'quote_repository.dart';
 import 'reading_preferences_repository.dart';
 import 'reading_stats_repository.dart';
 import 'reading_time_service.dart';
+import 'tag_repository.dart';
 import 'tag_weight_repository.dart';
 import 'update_service.dart';
 import 'user_profile_controller.dart';
@@ -85,10 +87,15 @@ class AppServices {
   /// 批注库。
 
   /// 阅读标签权重（雷达图数据源）。
+  late final TagRepository tags;
+
   late final TagWeightRepository tagWeights;
 
   /// 单本书阅读时长累计与落盘。
   late final ReadingTimeService readingTime;
+
+  /// 按章节记忆的阅读位置。
+  late final ReadingPositionRepository readingPositions;
 
   bool get isReady => _ready;
 
@@ -112,7 +119,9 @@ class AppServices {
     quotes = QuoteRepository();
     readingStats = ReadingStatsRepository(storage)..load();
     bookmarks = BookmarkRepository(storage);
-    tagWeights = TagWeightRepository(storage);
+    readingPositions = ReadingPositionRepository(storage);
+    tags = TagRepository(storage);
+    tagWeights = TagWeightRepository(storage, tags);
     readingTime = ReadingTimeService(
       books: books,
       tagWeights: tagWeights,

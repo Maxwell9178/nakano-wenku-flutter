@@ -174,6 +174,8 @@ class BookImportService {
     VolumeImportMode mode = VolumeImportMode.separate,
     Set<int> mergeSelection = const <int>{},
     String? groupLabel,
+    List<int>? mergeOrder,
+    List<String> tags = const <String>[],
     void Function(ImportProgress progress)? onProgress,
   }) async {
     if (!plan.hasVolumes) {
@@ -181,6 +183,25 @@ class BookImportService {
     }
 
     final List<Book> existing = _books.loadAll();
+
+    // 用户在界面上调整过的合并顺序：只影响「自选合并」那一组。
+    if (mergeOrder != null && mergeOrder.isNotEmpty) {
+      final Map<int, ImportedVolume> byIndex = <int, ImportedVolume>{
+        for (final ImportedVolume volume in plan.volumes)
+          volume.sourceIndex: volume,
+      };
+      final List<ImportedVolume> ordered = <ImportedVolume>[
+        for (final int index in mergeOrder)
+          if (byIndex[index] != null) byIndex[index]!,
+        for (final ImportedVolume volume in plan.volumes)
+          if (!mergeOrder.contains(volume.sourceIndex)) volume,
+      ];
+      plan = ImportPlan(
+        volumes: ordered,
+        failures: plan.failures,
+        totalFiles: plan.totalFiles,
+      );
+    }
 
     final List<List<ImportedVolume>> groups = _buildGroups(
       plan.volumes,
@@ -249,7 +270,7 @@ class BookImportService {
         coverPath: coverPath,
         wordCount: wordCount,
         chapterCount: chapters.length,
-        tags: const <String>[],
+        tags: tags,
         addedAt: DateTime.now(),
         isComic: group.first.document.isComic,
         group: (groupLabel == null || groupLabel.trim().isEmpty)

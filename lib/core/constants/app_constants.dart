@@ -25,8 +25,8 @@ class AppConstants {
   // ---------------- 版本信息 ----------------
 
   /// 需与 pubspec.yaml 的 version 保持一致。
-  static const String versionName = '1.0.4';
-  static const int versionCode = 5;
+  static const String versionName = '1.0.5';
+  static const int versionCode = 6;
 
   // ---------------- 版本更新 ----------------
 

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../../core/models/book.dart';
+import '../../../core/settings/app_settings.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/thin_divider.dart';
@@ -140,6 +141,29 @@ class BookCoverArt extends StatelessWidget {
         // 封面文件被用户删除时不报错，回落到绘制封面。
         errorBuilder: (BuildContext context, Object error, StackTrace? stack) {
           return _buildPlaceholder(brightness, dense);
+        },
+        // 封面解码完成时做一次「贴上去」的微动效（只作用在封面这一小块）。
+        frameBuilder: (
+          BuildContext context,
+          Widget child,
+          int? frame,
+          bool wasSynchronouslyLoaded,
+        ) {
+          if (wasSynchronouslyLoaded) {
+            return child;
+          }
+          final Duration d = AppSettingsController.motion(260);
+          return AnimatedOpacity(
+            opacity: frame == null ? 0 : 1,
+            duration: d,
+            curve: Curves.easeOut,
+            child: AnimatedScale(
+              scale: frame == null ? 1.055 : 1,
+              duration: d,
+              curve: Curves.easeOutCubic,
+              child: child,
+            ),
+          );
         },
       );
     }

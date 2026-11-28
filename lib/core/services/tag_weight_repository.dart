@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../constants/storage_keys.dart';
 import '../models/book.dart';
 import 'local_storage_service.dart';
+import 'tag_repository.dart';
 
 /// 阅读兴趣标签统计（雷达图数据源）。
 ///
@@ -12,22 +13,18 @@ import 'local_storage_service.dart';
 /// 3. 没有命中任何维度的书不计分；
 /// 4. 结果归一化到 0~1，供雷达图直接取用。
 class TagWeightRepository {
-  const TagWeightRepository(this._storage);
+  TagWeightRepository(this._storage, this._tags);
 
   final LocalStorageService _storage;
+  final TagRepository _tags;
+
+  /// 当前生效的标签维度（系统 + 自定义，实时变化）。
+  List<String> get dimensions => _tags.effectiveTags;
 
   /// 雷达图的六个维度（顺序固定，界面据此绘制轴）。
   ///
   /// 直接复用导入时的预设标签，避免出现书架上根本没有的分类，
   /// 也避免两处清单各自演化后对不上。
-  static const List<String> dimensions = <String>[
-    '文学',
-    '热血',
-    '科幻',
-    '恋爱',
-    '运动',
-    '悬疑',
-  ];
 
   /// 读取已持久化的分值（标签 → 原始分钟权重）。
   Map<String, int> loadRaw() {

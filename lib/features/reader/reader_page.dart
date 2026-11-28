@@ -16,6 +16,7 @@ import '../../core/services/excerpt_repository.dart';
 import '../../core/services/quote_repository.dart';
 import '../../core/services/reading_preferences_repository.dart';
 import '../../core/services/reading_stats_repository.dart';
+import '../../core/services/reading_position_repository.dart';
 import '../../core/services/reading_time_service.dart';
 import '../../core/services/user_profile_controller.dart';
 import '../../core/theme/app_colors.dart';
@@ -33,7 +34,6 @@ import '../../core/widgets/thin_divider.dart';
 import 'reader_controller.dart';
 import 'widgets/excerpt_picker_sheet.dart';
 import 'widgets/finished_share_card.dart';
-import 'widgets/quote_strip.dart';
 import 'widgets/reader_background.dart';
 import 'widgets/reader_settings_sheet.dart';
 import 'widgets/reader_sidebar.dart';
@@ -88,6 +88,10 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
   /// 是否由「目录 / 章节列表」明确指定章节进入：这类进入只停在章首。
   bool _explicitEntry = false;
 
+  /// 正文字体（来自全局设置）。在 build 里统一读一次，
+  /// 避免每段文字各自 watch 造成整章重建。
+  String? _fontFamily;
+
   /// 章节名同步的最小间隔：滚动很快时不必每帧都去量 RenderBox。
   static const Duration _chapterSyncInterval = Duration(milliseconds: 120);
   DateTime _lastChapterSync = DateTime.fromMillisecondsSinceEpoch(0);
@@ -137,6 +141,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
       preferencesRepository: context.read<ReadingPreferencesRepository>(),
       excerptRepository: context.read<ExcerptRepository>(),
       quoteRepository: context.read<QuoteRepository>(),
+      positions: context.read<ReadingPositionRepository>(),
       book: widget.book,
       initialChapterIndex: widget.chapterIndex,
     );
@@ -241,7 +246,13 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
       if (controller.preferences.pageMode == ReaderPageMode.horizontal) {
         _syncPageToChapter(chapter);
       } else {
+        final double saved = controller.chapterPosition(chapter) ?? 0;
         _jumpToChapter(chapter, animate: false);
+        if (saved > 0.01) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _restoreChapterOffset(chapter, saved);
+          });
+        }
       }
       return;
     }
@@ -307,6 +318,35 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
           .toDouble();
       _scroll.jumpTo(target);
     });
+  }
+
+  /// 把滚动位置挪到「某一章的某个比例处」。
+  ///
+  /// 与 [_restoreByProgress] 的区别：这里明确知道章节，
+  /// 所以不需要按整本书比例反推，直接按章内高度偏移。
+  void _restoreChapterOffset(int chapter, double ratio) {
+    if (!mounted || !_scroll.hasClients) {
+      return;
+    }
+    final ReaderController? controller = _controller;
+    final RenderBox? area = _listRenderBox();
+    if (controller == null || area == null) {
+      return;
+    }
+    final double? top = _chapterTop(chapter, area);
+    if (top == null) {
+      return;
+    }
+    final double? next = chapter + 1 < controller.chapterCount
+        ? _chapterTop(chapter + 1, area)
+        : _chapterEndBottom(chapter, area);
+    final double height =
+        (next == null || next - top <= 1) ? area.size.height : next - top;
+    final ScrollPosition position = _scroll.position;
+    final double target = (position.pixels + ratio * height)
+        .clamp(0.0, position.maxScrollExtent)
+        .toDouble();
+    _scroll.jumpTo(target);
   }
 
   /// 滚动时更新进度。
@@ -392,6 +432,19 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     }
     if (candidate != controller.currentChapter) {
       controller.setCurrentChapter(candidate);
+    }
+    // 记录这一章读到哪儿：下次无论从目录还是续读进来都能回到同一处。
+    final double? top = _chapterTop(candidate, area);
+    if (top != null) {
+      final double? next = candidate + 1 < total
+          ? _chapterTop(candidate + 1, area)
+          : _chapterEndBottom(candidate, area);
+      final double height =
+          (next == null || next - top <= 1) ? area.size.height : next - top;
+      controller.recordChapterPosition(
+        candidate,
+        (-top / height).clamp(0.0, 1.0).toDouble(),
+      );
     }
   }
 
@@ -949,7 +1002,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
         decorationColor: Colors.transparent,
         decorationStyle: TextDecorationStyle.solid,
         // 正文跟随设置里的字体来源；大标题一律走宋体，不受这里影响。
-        fontFamily: context.watch<AppSettingsController>().fontFamilyOverride,
+        fontFamily: _fontFamily,
       ),
     );
   }
@@ -1123,8 +1176,15 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
           prefs.bottomMargin + (_immersive ? 56 : 84),
         ),
         itemCount: controller.chapters.length,
+        // 每章一个重绘边界：滚动时只重绘进出视口的那一章，
+        // 不会把整本书的段落都标脏。
+        addAutomaticKeepAlives: false,
+        addRepaintBoundaries: false,
+        cacheExtent: 600,
         itemBuilder: (BuildContext context, int index) {
-          return _buildChapterChunk(controller, index, textColor, subColor);
+          return RepaintBoundary(
+            child: _buildChapterChunk(controller, index, textColor, subColor),
+          );
         },
       ),
     );
@@ -1347,42 +1407,46 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
         prefs.bottomMargin,
       ),
       // 分页模式不再套滚动视图：切页只按左右翻，页面内不允许上下滑动。
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          if (slice.isChapterStart) ...<Widget>[
-            Text(
-              'CHAPTER ${(slice.chapterIndex + 1).toString().padLeft(2, '0')}',
-              style: TextStyle(
-                fontSize: 8.6,
-                letterSpacing: 2.4,
-                color: AppColors.alpha(subColor, 0.72),
+      // ClipRect 兜住估算容量与实际行高之间的误差，
+      // 避免调大上下边距后最后一行被切一半、看着像「字消失了」。
+      child: ClipRect(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            if (slice.isChapterStart) ...<Widget>[
+              Text(
+                'CHAPTER ${(slice.chapterIndex + 1).toString().padLeft(2, '0')}',
+                style: TextStyle(
+                  fontSize: 8.6,
+                  letterSpacing: 2.4,
+                  color: AppColors.alpha(subColor, 0.72),
+                ),
               ),
-            ),
-            const SizedBox(height: 7),
-            Text(
-              heading,
-              style: TextStyle(
-                fontFamily: AppFonts.serif,
-                fontSize: 16.5,
-                height: 1.4,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.8,
-                color: textColor,
+              const SizedBox(height: 7),
+              Text(
+                heading,
+                style: TextStyle(
+                  fontFamily: AppFonts.serif,
+                  fontSize: 16.5,
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                  color: textColor,
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            ThinDivider(
-              width: 26,
-              thickness: 1.1,
-              color: AppColors.alpha(textColor, 0.32),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 10),
+              ThinDivider(
+                width: 26,
+                thickness: 1.1,
+                color: AppColors.alpha(textColor, 0.32),
+              ),
+              const SizedBox(height: 16),
+            ],
+            _buildParagraph(slice.text, prefs, textColor),
+            if (slice.isLastOfBook)
+              _buildFinishBlock(controller, textColor, subColor),
           ],
-          _buildParagraph(slice.text, prefs, textColor),
-          if (slice.isLastOfBook)
-            _buildFinishBlock(controller, textColor, subColor),
-        ],
+        ),
       ),
     );
   }
@@ -1391,6 +1455,7 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    _fontFamily = context.watch<AppSettingsController>().fontFamilyOverride;
     final ReaderController? controller = _controller;
     if (controller == null || !_loaded) {
       return const Scaffold(
@@ -1455,19 +1520,6 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
                         top: 0,
                         bottom: 0,
                         child: Center(child: _buildSidebar(controller)),
-                      ),
-                    if (_immersive)
-                      Positioned(
-                        left: 18,
-                        right: 18,
-                        bottom: 12,
-                        // 名言条只做展示：点击不切换名言，交给下层阅读区处理。
-                        child: IgnorePointer(
-                          child: QuoteStrip(
-                            quote: controller.quote,
-                            backgroundId: controller.backgroundId,
-                          ),
-                        ),
                       ),
                     Positioned(
                       right: 14,
@@ -1612,10 +1664,26 @@ class _ReaderPageState extends State<ReaderPage> with WidgetsBindingObserver {
     return ValueListenableBuilder<int>(
       valueListenable: _percent,
       builder: (BuildContext context, int value, Widget? child) {
-        return LiquidGlass(
-          borderRadius: 11,
+        // 这里刻意不用 LiquidGlass：进度胶囊一直浮在滚动列表上，
+        // BackdropFilter 每帧都要重采样背景，是阅读页掉帧的主因之一。
+        return Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-          shadows: false,
+          decoration: BoxDecoration(
+            color: AppColors.alpha(
+              ReaderBackgroundView.isDarkBackground(controller.backgroundId)
+                  ? Colors.black
+                  : Colors.white,
+              0.42,
+            ),
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(
+              color: AppColors.alpha(
+                ReaderBackgroundView.textColor(controller.backgroundId),
+                0.18,
+              ),
+              width: 0.8,
+            ),
+          ),
           child: Text(
             '$value%',
             style: TextStyle(

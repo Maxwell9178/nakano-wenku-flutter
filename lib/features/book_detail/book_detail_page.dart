@@ -11,6 +11,7 @@ import '../../core/models/bookmark.dart';
 import '../../core/models/chapter.dart';
 import '../../core/routing/app_routes.dart';
 import '../../core/services/book_repository.dart';
+import '../../core/services/tag_repository.dart';
 import '../../core/services/bookmark_repository.dart';
 import '../../core/services/chapter_repository.dart';
 import '../../core/theme/app_colors.dart';
@@ -19,6 +20,7 @@ import '../../core/utils/feedback.dart';
 import '../../core/utils/image_picker_helper.dart';
 import '../../core/widgets/confirm_dialog.dart';
 import '../../core/widgets/ghost_button.dart';
+import '../../core/widgets/glass_dialog.dart';
 import '../../core/widgets/grid_background.dart';
 import '../../core/widgets/liquid_glass.dart';
 import '../../core/widgets/page_top_bar.dart';
@@ -306,9 +308,10 @@ class _BookDetailPageState extends State<BookDetailPage> {
   Widget _buildTagsSection(BuildContext context) {
     final Brightness brightness = Theme.of(context).brightness;
     final List<String> tags = _c.book.tags;
-    final List<String> suggestions = AppConstants.presetTags
-        .where((String tag) => !tags.contains(tag))
-        .toList();
+    final TagRepository tagRepo = context.read<TagRepository>();
+    final List<String> pool = tagRepo.effectiveTags;
+    final List<String> suggestions =
+        pool.where((String tag) => !tags.contains(tag)).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,7 +321,10 @@ class _BookDetailPageState extends State<BookDetailPage> {
           child: SectionHeader(
             title: '标签',
             english: 'Tags',
-            trailing: _LinkText(label: '自定义', onTap: _addCustomTag),
+            trailing: _LinkText(
+              label: '管理',
+              onTap: () => _manageTags(tagRepo),
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -355,7 +361,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Text(
-            '点击已有标签可移除，点击浅色标签可快速添加。',
+            '每本最多 ${TagRepository.maxTagsPerBook} 个标签；点击已有标签可移除，浅色标签可添加。',
             style: TextStyle(
               fontSize: 9.5,
               color: AppColors.textTertiary(brightness),
@@ -819,6 +825,90 @@ class _BookDetailPageState extends State<BookDetailPage> {
     }
   }
 
+  /// 标签管理：新增自定义标签 / 删除任意标签（含系统预设）。
+  Future<void> _manageTags(TagRepository repo) async {
+    final Brightness brightness = Theme.of(context).brightness;
+    final List<String> pool = repo.effectiveTags;
+    await showGlassDialog<void>(
+      context: context,
+      builder: (BuildContext context) => GlassDialogCard(
+        title: '管理标签',
+        english: 'TAGS',
+        message: '最多 ${TagRepository.maxTags} 个标签，实时同步到兴趣雷达。',
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                for (final String tag in pool)
+                  GestureDetector(
+                    onTap: () async {
+                      await repo.remove(tag);
+                      if (context.mounted) {
+                        Navigator.of(context).pop();
+                        _manageTags(repo);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: AppColors.divider(brightness),
+                          width: 0.9,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(
+                            tag,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: AppColors.textPrimary(brightness),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Icon(
+                            Icons.close_rounded,
+                            size: 12,
+                            color: AppColors.textTertiary(brightness),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '点击标签可删除（系统标签也能删，删完可重新加回）。',
+              style: TextStyle(
+                fontSize: 9.5,
+                color: AppColors.textTertiary(brightness),
+              ),
+            ),
+          ],
+        ),
+        actions: <Widget>[
+          GlassDialogButton(
+            label: '新增标签',
+            primary: true,
+            onTap: () async {
+              Navigator.of(context).pop();
+              await _addCustomTag();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _addCustomTag() async {
     final String? value = await showTextInputDialog(
       context: context,
@@ -834,10 +924,26 @@ class _BookDetailPageState extends State<BookDetailPage> {
         if (_c.book.tags.contains(tag)) {
           return '这本已经有「$tag」标签了';
         }
+        final TagRepository repo = context.read<TagRepository>();
+        if (!repo.effectiveTags.contains(tag) && repo.isFull) {
+          return '标签最多 ${TagRepository.maxTags} 个，先去管理里删掉一个';
+        }
         return null;
       },
     );
     if (value == null || !mounted) {
+      return;
+    }
+    // 自定义标签同时进入标签池，避免下次还要重新输入。
+    final TagRepository repo = context.read<TagRepository>();
+    if (!repo.effectiveTags.contains(value)) {
+      final bool ok = await repo.add(value);
+      if (!ok && mounted) {
+        showSoftMessage(context, '标签池已满（最多 ${TagRepository.maxTags} 个）');
+        return;
+      }
+    }
+    if (!mounted) {
       return;
     }
     await _addTag(value);

@@ -121,6 +121,9 @@ class ProfileController extends ChangeNotifier {
   ///
   /// 权重由「书籍标签 × 阅读时长」累加而来，阅读页每次退出都会刷新，
   /// 这里只读已持久化的结果并归一化。
+  /// 当前生效的标签维度（自定义 + 系统，实时变化）。
+  List<String> get tagDimensions => _tagWeights.dimensions;
+
   List<double> get tagRadar {
     final Map<String, int> raw = _tagWeights.loadRaw();
     return _tagWeights.normalized(raw);

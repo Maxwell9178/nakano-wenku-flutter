@@ -599,7 +599,7 @@ class _ProfilePageState extends State<ProfilePage> {
   ) {
     // 八维：标签权重 × 阅读时长，阅读页退出后即时刷新。
     final List<double> values = controller.tagRadar;
-    final List<String> dims = TagWeightRepository.dimensions;
+    final List<String> dims = controller.tagDimensions;
     final Map<String, double> ratios = <String, double>{
       for (int i = 0; i < dims.length; i++)
         dims[i]: i < values.length ? values[i] : 0,

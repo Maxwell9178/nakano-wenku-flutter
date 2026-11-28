@@ -161,8 +161,17 @@ class BookCarouselState extends State<BookCarousel> {
     // 保持在当前这一轮里移动，避免跨轮跳动造成视觉跳变。
     final double cycleStart = current - ((current % _count) + _count) % _count;
     final double target = cycleStart + clamped * _count;
-    _page = target;
-    _controller.jumpToPage(target.round());
+    // 这里用像素直接定位（而不是 jumpToPage(int)）：
+    // PageView 会停在两本书之间，3D 几何按小数页连续插值，
+    // 拖动滑动条时书是「转过去」的，而不是封面一张张硬切。
+    // 不预先改 _page，交给 _handleScroll 统一更新，
+    // 否则信息区收不到 onCenterChanged，书名会停在滑动前的那本。
+    final double viewport = _controller.position.viewportDimension;
+    if (viewport <= 0) {
+      return;
+    }
+    _controller.position.jumpTo(target * viewport);
+    widget.onFractionChanged?.call(clamped);
   }
 
   /// 滑到头后回到「第一本」：整体前移一轮，视觉上是同一本书，
