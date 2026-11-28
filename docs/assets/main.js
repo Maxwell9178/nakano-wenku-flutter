@@ -239,7 +239,8 @@
     const btnEl = document.getElementById("androidDownload");
     const labelEl = document.getElementById("androidDownloadLabel");
     if (!verEl || !btnEl) return;
-    const manifest = "https://raw.githubusercontent.com/Maxwell9178/nakano-wenku-flutter/main/version.json";
+    // 同源清单：不再依赖 raw.githubusercontent.com（国内经常被墙）
+    const manifest = "version.json";
     fetch(manifest, { cache: "no-store" })
       .then(function (res) { return res.ok ? res.json() : null; })
       .then(function (data) {
@@ -248,7 +249,6 @@
         if (!/^\d+(\.\d+)+$/.test(name)) return;
         verEl.textContent = "v" + name;
         if (labelEl) labelEl.textContent = "安装安卓版 v" + name;
-        if (data.downloadUrl) btnEl.setAttribute("href", data.downloadUrl);
         if (data.changelog && String(data.changelog).trim()) {
           btnEl.setAttribute("title", "本次更新：" + String(data.changelog).trim().split("\n")[0]);
         }

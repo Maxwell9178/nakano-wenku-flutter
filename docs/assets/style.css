@@ -856,3 +856,12 @@ html[data-theme="light"] .theme-toggle .icon-sun { display: block; }
   .dc-meta { margin: 20px 0; }
   .modal-actions { flex-direction: column; }
 }
+
+/* 下载备用入口 */
+.dc-alt {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+.dc-alt:hover { opacity: .72; }
